@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Heart, MessageSquare, Clock, Send, Share2, Eye, Calendar, ThumbsUp, Check, Type, Bookmark } from "lucide-react";
 import { motion } from "motion/react";
 import { Article, Comment } from "../types";
+import { fetchArticleById, likeArticleClient, addCommentClient } from "../lib/newsClient";
 import AudioNewsReader from "./AudioNewsReader";
 
 interface ArticleDetailProps {
@@ -25,15 +26,13 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/news/${articleId}`)
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Failed to load article");
-      })
-      .then((data: Article) => {
-        setArticle(data);
-        setLikeCount(data.likes || 0);
-        setComments(data.comments || []);
+    fetchArticleById(articleId)
+      .then((data: Article | null) => {
+        if (data) {
+          setArticle(data);
+          setLikeCount(data.likes || 0);
+          setComments(data.comments || []);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -44,12 +43,7 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
 
   const handleLike = () => {
     if (hasLiked) return;
-    
-    fetch(`/api/news/${articleId}/like`, { method: "POST" })
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Like failed");
-      })
+    likeArticleClient(articleId)
       .then((data) => {
         setLikeCount(data.likes);
         setHasLiked(true);
@@ -61,17 +55,9 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
     e.preventDefault();
     if (!commentName.trim() || !commentText.trim()) return;
 
-    fetch(`/api/news/${articleId}/comment`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: commentName, text: commentText }),
-    })
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Comment submit failed");
-      })
+    addCommentClient(articleId, commentName, commentText)
       .then((data) => {
-        setComments((prev) => [...prev, data.comment]);
+        setComments(data.comments);
         setCommentName("");
         setCommentText("");
         setCommentSuccess(true);

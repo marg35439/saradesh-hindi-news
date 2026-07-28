@@ -11,6 +11,7 @@ import AudioNewsReader from "./components/AudioNewsReader";
 import SavedArticlesModal from "./components/SavedArticlesModal";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { Article, CategoryKey, CATEGORIES, STATES } from "./types";
+import { fetchNewsList } from "./lib/newsClient";
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -154,19 +155,7 @@ export default function App() {
 
   const loadNews = () => {
     setLoading(true);
-    let url = `/api/news?category=${selectedCategory}`;
-    if (selectedCategory === "state" && selectedState) {
-      url += `&state=${encodeURIComponent(selectedState)}`;
-    }
-    if (searchQuery.trim()) {
-      url += `&search=${encodeURIComponent(searchQuery.trim())}`;
-    }
-
-    fetch(url)
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Unable to retrieve news articles");
-      })
+    fetchNewsList(selectedCategory, selectedState, searchQuery)
       .then((data: Article[]) => {
         setArticles(data);
         setLoading(false);

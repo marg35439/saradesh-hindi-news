@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { Article, CATEGORIES, STATES } from "../types";
+import { fetchNewsList, saveArticleClient, deleteArticleClient } from "../lib/newsClient";
 
 // Helper function to compress images before storing to keep database and UI light & fast
 const compressImageFile = (file: File, maxWidth = 1000, quality = 0.75): Promise<string> => {
@@ -159,8 +160,7 @@ export default function AdminPanel() {
 
   const loadArticles = () => {
     setLoading(true);
-    fetch("/api/news")
-      .then((res) => res.json())
+    fetchNewsList()
       .then((data) => {
         setArticles(data);
         setLoading(false);
@@ -586,6 +586,7 @@ export default function AdminPanel() {
     if (!title.trim() || !content.trim()) return;
 
     const payload = {
+      ...(editingId ? { id: editingId } : {}),
       title,
       subtitle,
       content,
@@ -599,18 +600,7 @@ export default function AdminPanel() {
       isTrending
     };
 
-    const url = editingId ? `/api/news/${editingId}` : "/api/news";
-    const method = editingId ? "PUT" : "POST";
-
-    fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error("Save article failed");
-      })
+    saveArticleClient(payload)
       .then(() => {
         resetForm();
         loadArticles();
@@ -637,14 +627,10 @@ export default function AdminPanel() {
   };
 
   const handleDelete = (id: string) => {
-    fetch(`/api/news/${id}`, { method: "DELETE" })
-      .then((res) => {
-        if (res.ok) {
-          loadArticles();
-          setDeleteConfirmId(null);
-        } else {
-          throw new Error("Delete failed");
-        }
+    deleteArticleClient(id)
+      .then(() => {
+        loadArticles();
+        setDeleteConfirmId(null);
       })
       .catch((err) => console.error(err));
   };
