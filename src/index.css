@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@keyframes marquee {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+@theme {
+  --animate-spin-slow: spin 20s linear infinite;
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 320s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

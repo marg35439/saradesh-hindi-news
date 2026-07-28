@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "comment": {
+      "title": "Comment",
+      "description": "User comment on a news article",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "text": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "name", "text", "date"]
+    },
+    "article": {
+      "title": "Article",
+      "description": "Dainik Bhaskar styled news article",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "state": { "type": "string" },
+        "image": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "readTime": { "type": "integer" },
+        "views": { "type": "integer" },
+        "likes": { "type": "integer" },
+        "comments": {
+          "type": "array",
+          "items": { "type": "object", "$ref": "#/entities/comment" }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "isBreaking": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "isTrending": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "subtitle", "content", "category", "image", "author", "date", "readTime", "views", "likes", "isBreaking", "isFeatured", "isTrending"]
+    }
+  },
+  "firestore": {
+    "/articles/{articleId}": {
+      "schema": "article",
+      "description": "Universal news articles list"
+    }
+  }
+}

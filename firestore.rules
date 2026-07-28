@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Anyone can read articles and comments.
+    // Writes are done via backend server (which runs server-side).
+    // Let's allow read and write directly to support local connections.
+    match /articles/{articleId} {
+      allow read, write: if true;
+    }
+    
+    // Default fallback rule for any other collection
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
