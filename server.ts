@@ -2736,6 +2736,113 @@ async function ensureRequestedArticlesExist() {
   }
 }
 
+// SEO & Search Console: Robots.txt and Dynamic XML Sitemap handlers
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain");
+  res.send(`User-agent: *
+Allow: /
+
+Sitemap: https://saradesh.in/sitemap.xml
+Sitemap: https://saradesh.in/sitemap-index.xml
+`);
+});
+
+async function generateSitemapXml(hostHeader?: string): Promise<string> {
+  const domain = "saradesh.in";
+  const baseUrl = `https://${domain}`;
+  const categories = ["national", "state", "business", "sports", "entertainment", "tech", "lifestyle", "international"];
+
+  let articlesList: any[] = [];
+  try {
+    const querySnapshot = await getDocs(collection(db, "articles"));
+    querySnapshot.forEach((docSnap) => {
+      articlesList.push(docSnap.data());
+    });
+  } catch (err) {
+    console.warn("Sitemap: Failed to load articles from Firestore, fallback to defaults", err);
+    articlesList = DEFAULT_NEWS;
+  }
+
+  const currentDate = new Date().toISOString().split("T")[0];
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">\n`;
+
+  // Homepage
+  xml += `  <url>\n`;
+  xml += `    <loc>${baseUrl}/</loc>\n`;
+  xml += `    <lastmod>${currentDate}</lastmod>\n`;
+  xml += `    <changefreq>always</changefreq>\n`;
+  xml += `    <priority>1.0</priority>\n`;
+  xml += `  </url>\n`;
+
+  // Categories
+  for (const cat of categories) {
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/?category=${cat}</loc>\n`;
+    xml += `    <lastmod>${currentDate}</lastmod>\n`;
+    xml += `    <changefreq>hourly</changefreq>\n`;
+    xml += `    <priority>0.8</priority>\n`;
+    xml += `  </url>\n`;
+  }
+
+  // Articles
+  for (const art of articlesList) {
+    if (!art || !art.id) continue;
+    const artDate = art.createdAt ? new Date(art.createdAt).toISOString().split("T")[0] : currentDate;
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
+    xml += `    <lastmod>${artDate}</lastmod>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>0.9</priority>\n`;
+    if (art.title) {
+      const escapeXml = (str: string) =>
+        str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&apos;");
+      xml += `    <news:news>\n`;
+      xml += `      <news:publication>\n`;
+      xml += `        <news:name>सारादेश.in</news:name>\n`;
+      xml += `        <news:language>hi</news:language>\n`;
+      xml += `      </news:publication>\n`;
+      xml += `      <news:publication_date>${artDate}</news:publication_date>\n`;
+      xml += `      <news:title>${escapeXml(art.title)}</news:title>\n`;
+      xml += `    </news:news>\n`;
+    }
+    xml += `  </url>\n`;
+  }
+
+  xml += `</urlset>`;
+  return xml;
+}
+
+app.get(["/sitemap.xml", "/api/sitemap"], async (req, res) => {
+  try {
+    const xml = await generateSitemapXml(req.headers.host);
+    res.header("Content-Type", "application/xml; charset=utf-8");
+    res.status(200).send(xml);
+  } catch (err: any) {
+    console.error("Error generating sitemap:", err);
+    res.status(500).send("Error generating sitemap: " + err.message);
+  }
+});
+
+app.get("/sitemap-index.xml", (req, res) => {
+  const currentDate = new Date().toISOString().split("T")[0];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://saradesh.in/sitemap.xml</loc>
+    <lastmod>${currentDate}</lastmod>
+  </sitemap>
+</sitemapindex>`;
+  res.header("Content-Type", "application/xml; charset=utf-8");
+  res.status(200).send(xml);
+});
+
 async function startServer() {
   // Serve static Vite site in prod, or run dev middleware
   if (process.env.NODE_ENV !== "production") {

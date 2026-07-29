@@ -129,10 +129,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 1. Check URL parameters for ?admin=true
+    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?state=...
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") {
       setIsAdminMode(true);
+    }
+    const initialArticleId = params.get("article") || params.get("id");
+    if (initialArticleId) {
+      setSelectedArticleId(initialArticleId);
+    }
+    const initialCat = params.get("category");
+    if (initialCat) {
+      setSelectedCategory(initialCat as CategoryKey);
+    }
+    const initialState = params.get("state");
+    if (initialState) {
+      setSelectedState(initialState);
     }
 
     // 2. Keyboard shortcut: Alt + Shift + A to toggle admin mode secretly
@@ -169,12 +181,18 @@ export default function App() {
   const handleArticleClick = (art: Article) => {
     setIsAdminMode(false); // return to normal reading
     setSelectedArticleId(art.id);
+    try {
+      window.history.pushState({}, "", "?article=" + encodeURIComponent(art.id));
+    } catch {}
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCategorySelect = (key: CategoryKey) => {
     setSelectedCategory(key);
     setSelectedArticleId(null); // return to lists
+    try {
+      window.history.pushState({}, "", key === "all" ? "/" : "?category=" + encodeURIComponent(key));
+    } catch {}
   };
 
   const handleStateSelect = (state: string) => {
