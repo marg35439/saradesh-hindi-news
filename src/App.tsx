@@ -38,7 +38,9 @@ export default function App() {
     setSavedArticleIds((prev) => {
       const exists = prev.includes(article.id);
       const updated = exists ? prev.filter((id) => id !== article.id) : [...prev, article.id];
-      localStorage.setItem("sara_saved_news", JSON.stringify(updated));
+      try {
+        localStorage.setItem("sara_saved_news", JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
@@ -46,14 +48,18 @@ export default function App() {
   const removeBookmark = (articleId: string) => {
     setSavedArticleIds((prev) => {
       const updated = prev.filter((id) => id !== articleId);
-      localStorage.setItem("sara_saved_news", JSON.stringify(updated));
+      try {
+        localStorage.setItem("sara_saved_news", JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
 
   const clearAllBookmarks = () => {
     setSavedArticleIds([]);
-    localStorage.removeItem("sara_saved_news");
+    try {
+      localStorage.removeItem("sara_saved_news");
+    } catch {}
   };
 
   // Filtering states
@@ -64,12 +70,18 @@ export default function App() {
 
   // Local opinion poll states
   const [hasVoted, setHasVoted] = useState<boolean>(() => {
-    return localStorage.getItem("sara_poll_voted") === "true";
+    try {
+      return localStorage.getItem("sara_poll_voted") === "true";
+    } catch {
+      return false;
+    }
   });
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [pollVotes, setPollVotes] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem("sara_poll_votes");
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem("sara_poll_votes");
+      if (saved) return JSON.parse(saved);
+    } catch {}
     return { A: 1482, B: 615, C: 198 }; 
   });
 
@@ -80,8 +92,10 @@ export default function App() {
     };
     setPollVotes(newVotes);
     setHasVoted(true);
-    localStorage.setItem("sara_poll_voted", "true");
-    localStorage.setItem("sara_poll_votes", JSON.stringify(newVotes));
+    try {
+      localStorage.setItem("sara_poll_voted", "true");
+      localStorage.setItem("sara_poll_votes", JSON.stringify(newVotes));
+    } catch {}
   };
 
   // Sidebar weather data
@@ -1203,7 +1217,7 @@ uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन
                 <button
                   key={cat.id}
                   onClick={() => {
-                    setSelectedCategory(cat.id);
+                    setSelectedCategory(cat.id as CategoryKey);
                     setSelectedArticleId(null);
                     setSearchQuery("");
                     window.scrollTo({ top: 0, behavior: "smooth" });

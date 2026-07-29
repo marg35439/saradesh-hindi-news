@@ -76,7 +76,7 @@ export default function AdminPanel() {
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "scraper" | "compiler" | "urlScraper" | "screenshot">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot">("list");
   
   // AI Screenshot news generator States
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
@@ -100,12 +100,6 @@ export default function AdminPanel() {
   const [compiledArticles, setCompiledArticles] = useState<any[]>([]);
   const [compilerError, setCompilerError] = useState("");
   const [publishingCompiled, setPublishingCompiled] = useState(false);
-  
-  // Real-time News scraper states
-  const [scrapedNews, setScrapedNews] = useState<any[]>([]);
-  const [scraping, setScraping] = useState(false);
-  const [scrapeError, setScrapeError] = useState("");
-  const [draftingItem, setDraftingItem] = useState<string | null>(null);
   
   // Form States
   const [title, setTitle] = useState("");
@@ -134,12 +128,7 @@ export default function AdminPanel() {
   const [aiStatusText, setAiStatusText] = useState("");
   const [aiError, setAiError] = useState("");
 
-  // AI Autopilot Daily Auto-Post states
-  const [autopilotLoading, setAutopilotLoading] = useState(false);
-  const [autopilotMessage, setAutopilotMessage] = useState("");
-  const [autopilotError, setAutopilotError] = useState("");
-
-  // Today 21 May 2026 Top-10 mass publisher states
+  // Today Top-10 mass publisher states
   const [publishing10, setPublishing10] = useState(false);
   const [publish10Status, setPublish10Status] = useState("");
 
@@ -503,84 +492,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleAutopilotTrigger = async () => {
-    setAutopilotLoading(true);
-    setAutopilotMessage("");
-    setAutopilotError("");
-    try {
-      const res = await fetch("/api/gemini/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Autopilot auto-post failed");
-      }
-      setAutopilotMessage(`सफलतापूर्वक पब्लिश: "${data.article.title.substring(0, 50)}..."`);
-      loadArticles(); // Reload the news list instantly in dashboard database
-    } catch (err: any) {
-      console.error(err);
-      setAutopilotError(err.message || "ऑटो-पायलट पब्लिशिंग विफल रही।");
-    } finally {
-      setAutopilotLoading(false);
-    }
-  };
-
-  const handleScrapeNews = async () => {
-    setScraping(true);
-    setScrapeError("");
-    setScrapedNews([]);
-    try {
-      const res = await fetch("/api/gemini/scrape-hot-news", {
-        method: "POST"
-      });
-      if (!res.ok) throw new Error("समाचार क्रॉल करने में त्रुटि आई");
-      const data = await res.json();
-      setScrapedNews(data);
-    } catch (err: any) {
-      console.error(err);
-      setScrapeError(err.message || "ताजा खबरें खोजने में असमर्थ। जेमिनी लिमिट के कारण कृपया पुनः प्रयास करें।");
-    } finally {
-      setScraping(false);
-    }
-  };
-
-  const handleDraftCompletedNews = async (item: any) => {
-    setDraftingItem(item.tempId);
-    setAiError("");
-    try {
-      const res = await fetch("/api/gemini/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          prompt: `Write a complete detailed news article in Hindi language about the recent event headline: "${item.title}". Source reports: "${item.summary}". Focus on realistic editorial news layout of SaraDesh.`, 
-          category: item.category 
-        })
-      });
-      
-      if (!res.ok) throw new Error("इस खबर को विस्तृत आलेख में बदलने में त्रुटि आई");
-      const data = await res.json();
-      
-      // Populate form states
-      setTitle(data.title || item.title);
-      setSubtitle(data.subtitle || item.summary);
-      setContent(data.content || "");
-      setCategory(data.category || item.category);
-      setAuthor(data.author || `विशेष संवाददाता, भोपाल`);
-      setTags(data.tags ? data.tags.join(", ") : "");
-      setImage(data.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80");
-      
-      // Smooth transition to Create tab to review & publish!
-      setActiveTab("create");
-      setEditingId(null); // Ensure it's treated as a new article
-    } catch (err: any) {
-      console.error(err);
-      alert("एआई न्यूज़ ड्राफ्टर अनुपलब्ध या व्यस्त है: " + err.message);
-    } finally {
-      setDraftingItem(null);
-    }
-  };
-
   const handleSaveArticle = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
@@ -797,16 +708,6 @@ export default function AdminPanel() {
           }`}
         >
           📊 पोर्टल डेटा एवं इनसाइट्स
-        </button>
-        <button
-          onClick={() => setActiveTab("scraper")}
-          className={`px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
-            activeTab === "scraper"
-              ? "border-[#ff6f00] text-[#ff6f00]"
-              : "border-transparent text-neutral-500 hover:text-neutral-800"
-          }`}
-        >
-          🤖 एआई लाइव स्क्रैपर
         </button>
         <button
           onClick={() => setActiveTab("urlScraper")}
@@ -1221,54 +1122,6 @@ export default function AdminPanel() {
                 <li><span className="font-semibold text-[#ff6f00]">अंतरराष्ट्रीय:</span> "यूरोप में नया आर्थिक समझौता"</li>
               </ul>
             </div>
-
-            {/* AI Autopilot Card (Daily automatic news trigger) */}
-            <div className="bg-[#f0fdf4] border border-green-200 p-5 rounded-xl shadow-xs space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-green-100 text-green-700 font-bold border border-green-200">
-                  <Sparkles className="w-4 h-4 text-green-700 animate-pulse" />
-                </div>
-                <h4 className="font-extrabold text-neutral-900 text-xs tracking-wider uppercase">एआई ऑटो-पायलट (ऑटो न्यूज लेखक)</h4>
-              </div>
-              <p className="text-[11px] text-neutral-600 leading-relaxed font-sans">
-                इस बटन पर क्लिक करते ही जेमिनी एआई गूगल सर्च से आज की देश-विदेश की ताज़ा खबर खोजकर, उसका पूरा हिंदी संपादकीय लेख लिखेगा और इसे आपके पोर्टल पर <b>स्वचालित रूप से पब्लिश</b> कर देगा!
-              </p>
-              
-              {autopilotMessage && (
-                <div className="text-[10px] font-bold text-green-800 bg-green-50 border border-green-100 p-2.5 rounded-lg leading-relaxed font-sans">
-                  {autopilotMessage}
-                </div>
-              )}
-
-              {autopilotError && (
-                <div className="text-[10px] font-bold text-rose-800 bg-rose-50 border border-rose-100 p-2.5 rounded-lg leading-relaxed font-sans">
-                  {autopilotError}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleAutopilotTrigger}
-                disabled={autopilotLoading}
-                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition-colors shadow-sm disabled:opacity-50"
-              >
-                {autopilotLoading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>देश-विदेश की ताज़ा खबर खोजी जा रही है...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 font-bold" />
-                    <span>ताज़ा खबर लिखें और ऑटो-पब्लिश करें 🚀</span>
-                  </>
-                )}
-              </button>
-
-              <div className="text-[9px] text-neutral-400 font-sans leading-normal pt-1 border-t border-green-100">
-                💡 <b>उत्पादन स्तर स्वचालन:</b> प्रति दिन ऑटो-पोस्ट करने के लिए आप किसी बाहरी क्रॉन जॉब सर्विस से इस यूआरएल को हिट कर सकते हैं: <code className="bg-neutral-100 text-neutral-700 px-1 py-0.5 rounded text-[8.5px] font-mono">POST /api/gemini/autopilot</code>
-              </div>
-            </div>
           </div>
 
           {/* RIGHT COLUMN: MANUAL ENTRY / OR REVIEW DRAFT FORM */}
@@ -1675,125 +1528,6 @@ export default function AdminPanel() {
             </form>
           </div>
 
-        </div>
-      )}
-
-      {/* TAB CONTENT: AI CRAWLER/SCRAPER */}
-      {activeTab === "scraper" && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-indigo-950 via-[#190a2c] to-neutral-900 text-white rounded-xl p-6 md:p-8 border border-purple-500/25 shadow-md">
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="bg-purple-500 text-xs text-white font-extrabold uppercase px-2.5 py-1 rounded font-sans tracking-wider animate-pulse">
-                  लाइव वेब री-सर्च सक्रिय है
-                </span>
-                <span className="text-xs text-purple-300 font-sans font-medium">गूगल सर्च ग्राउंडिंग आधारित तकनीक</span>
-              </div>
-              <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">मुख्य मीडिया (आजतक, नवभारत टाइम्स, दैनिक भास्कर) लाइव स्क्रैपर</h3>
-              <p className="text-xs md:text-sm text-purple-200/80 leading-relaxed font-sans mt-2">
-                यह विशेष प्रणाली भारत के प्रमुख समाचार पोर्टलों जैसे <b>आजतक (Aaj Tak)</b>, <b>नवभारत टाइम्स (NBT)</b> और <b>दैनिक भास्कर</b> पर पिछले 1 घंटे के भीतर पोस्ट की गई ताज़ा खबरों को लाइव स्कैन और क्रॉल करती है। जेमिनी लाइव वेब री-सर्च इंजन से प्राप्त इन टॉप हॉटख़बरों को आप तुरंत अपनी पसंद से चुनकर एक क्लिक में सारादेश.in की प्रामाणिक संपादकीय शैली में कस्टमाइज़ कर पब्लिश कर सकते हैं।
-              </p>
-              
-              <div className="mt-6 flex flex-wrap items-center gap-4">
-                <button
-                  type="button"
-                  onClick={handleScrapeNews}
-                  disabled={scraping}
-                  className="flex items-center gap-2 px-6 py-3.5 bg-[#ff6f00] hover:bg-amber-600 text-white font-extrabold rounded-lg text-xs tracking-wider transition-colors shadow-lg cursor-pointer hover:shadow-orange-700/20 disabled:opacity-50"
-                >
-                  {scraping ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
-                      <span>खबरों को क्रॉल किया जा रहा है...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 shrink-0" />
-                      <span>पिछले 1 घंटे की टॉप ख़बरें खोजें 🔍</span>
-                    </>
-                  )}
-                </button>
-                {scrapedNews.length > 0 && (
-                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/30 border border-emerald-900 px-3 py-1 rounded-lg font-sans">
-                    ✅ {scrapedNews.length} प्रमुख खबरें लाइव प्राप्त हुईं!
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {scrapeError && (
-            <div className="text-xs font-bold text-rose-850 bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-2 font-sans">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-              <span>{scrapeError}</span>
-            </div>
-          )}
-
-          {scraping && (
-            <div className="text-center py-20 bg-white border border-neutral-200 rounded-xl shadow-xs animate-pulse flex flex-col items-center justify-center">
-              <div className="w-12 h-12 rounded-full border-4 border-[#ff6f00] border-t-transparent animate-spin mb-4"></div>
-              <p className="text-sm font-black text-neutral-800">ताजा डिजिटल प्रेस रिपोर्ट्स और समाचार साइट्स को स्कैन किया जा रहा है...</p>
-              <p className="text-xs text-neutral-400 font-sans mt-15">इसमें लगभग 10-15 सेकंड का समय लग सकता है।</p>
-            </div>
-          )}
-
-          {!scraping && scrapedNews.length === 0 && (
-            <div className="text-center py-24 bg-white border border-neutral-200 rounded-xl shadow-xs">
-              <Sparkles className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-              <p className="text-sm font-bold text-neutral-600">कोई क्रॉल डेटा लोड नहीं है।</p>
-              <p className="text-xs text-neutral-400 font-sans mt-0.5">पिछले 1 घंटे के लाइव ट्रेंडिंग टॉपिक लाने हेतु ऊपर "खोजें" बटन पर क्लिक करें।</p>
-            </div>
-          )}
-
-          {!scraping && scrapedNews.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {scrapedNews.map((item) => (
-                <div key={item.tempId} className="bg-white border rounded-xl p-5 hover:border-[#ff6f00] transition-all flex flex-col justify-between shadow-xs">
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-neutral-100 border text-neutral-700 px-2.5 py-0.5 rounded">
-                        {item.category === "national" ? "देश" : 
-                         item.category === "state" ? "राज्य" : 
-                         item.category === "sports" ? "खेल" : 
-                         item.category === "entertainment" ? "मनोरंजन" : 
-                         item.category === "business" ? "बिजनेस" : 
-                         item.category === "tech" ? "टेक" : 
-                         item.category === "lifestyle" ? "लाइफस्टाइल" : "विदेश"}
-                      </span>
-                      <span className="text-[10px] font-bold text-neutral-400 font-sans">स्रोत: {item.source || "वेब समाचार"}</span>
-                    </div>
-
-                    <h4 className="text-sm font-black text-neutral-900 leading-snug line-clamp-2">{item.title}</h4>
-                    <p className="text-xs text-neutral-500 font-sans leading-relaxed mt-2.5 line-clamp-3">{item.summary}</p>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-neutral-100 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-medium text-neutral-400 font-sans max-w-[50%] truncate shrink-0">
-                      संकेत: {item.searchQuery || item.title}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDraftCompletedNews(item)}
-                      disabled={draftingItem !== null}
-                      className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-black rounded-lg text-[11px] cursor-pointer transition-all shrink-0"
-                    >
-                      {draftingItem === item.tempId ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>प्रीमियम खबर जनरेट हो रही है...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>विस्तृत खबर बनाकर ड्राफ्ट में डालें ⚡</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

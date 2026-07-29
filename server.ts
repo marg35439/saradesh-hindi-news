@@ -1383,7 +1383,7 @@ For each real story, compile:
 - A short English search term representing the occurrence.`;
 
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: searchPrompt,
       config: {
         tools: [{ googleSearch: {} }] // Simpler call with search grounding
@@ -1409,7 +1409,7 @@ interface ScrapedNewsItem {
 }`;
 
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `Parse these real-time news articles text and output them as a JSON array according to the schema:
       
       ${searchOutputText}`,
@@ -1447,39 +1447,39 @@ interface ScrapedNewsItem {
     }
   } catch (err: any) {
     console.warn("Crawler quota exhausted or failed, returning premium seed trending items:", err.message);
-    // Let's provide 4-5 premium real trending fallback events in case of API Key / rate limit issues. This ensures the app is bulletproof and works gracefully!
+    const todayStr = new Date().toLocaleDateString('hi-IN', { year: 'numeric', month: 'long', day: 'numeric' });
     const crawlerFallback = [
       {
         tempId: "f-1",
-        title: "मौसम विभाग की भारी चेतावनी: उत्तर भारत में भीषण गर्मी के बीच अचानक तेज आंधी और बारिश का ऑरेंज अलर्ट",
-        summary: "मौसम विज्ञान विभाग (IMD) ने राष्ट्रीय राजधानी दिल्ली, पंजाब, हरियाणा और पश्चिमी उत्तर प्रदेश के कई जिलों में आगामी कुछ घंटों में तेज रफ्तार आंधी व हल्की बारिश की चेतावनी दी है। यह हालिया बदलाव तापमान में हल्की गिरावट ला सकता है।",
+        title: "मौसम विभाग की ताज़ा चेतावनी: देश के प्रमुख राज्यों में मौसम के अचानक बदलाव का अलर्ट जारी",
+        summary: "मौसम विज्ञान विभाग (IMD) ने राष्ट्रीय राजधानी क्षेत्र और कई उत्तरी राज्यों में आगामी 24 घंटों के लिए मौसम संबंधी ताज़ा चेतावनी जारी की है। इस बदलाव से तापमान में बदलाव और हल्की बूंदाबांदी का अनुमान है।",
         category: "national",
-        source: "IMD मौसम रिपोर्ट",
-        searchQuery: "India IMD weather report orange alert storm rain north india actual status"
+        source: "IMD मौसम रिपोर्ट (" + todayStr + ")",
+        searchQuery: "India IMD weather report orange alert storm rain status"
       },
       {
         tempId: "f-2",
-        title: "भारतीय शेयर बाजार नए शिखर पर: सेंसेक्स पहली बार रिकॉर्ड ऐतिहासिक पार, निफ्टी ने छुए नए आंकड़े",
-        summary: "ग्लोबल मार्केट से मिले मजबूत संकेतों के बीच भारतीय शेयर बाजार में चौतरफा लिवाली देखी गई। बैंकिंग और आईटी सेक्टर के शेयरों में जोरदार बढ़त के कारण निफ्टी और सेंसेक्स अब तक के अपने सबसे उच्चतम स्तर पर बंद हुए हैं।",
+        title: "भारतीय शेयर बाजार का ताज़ा हाल: बैंकिंग व टेक शेयरों में मजबूत लिवाली से बाजार में रौनक",
+        summary: "ग्लोबल मार्केट से मिले संकेतों के बीच भारतीय शेयर बाजार में निवेशकों का भरोसा बना हुआ है। आईटी और बैंकिंग सेक्टर के प्रमुख शेयरों में लिवाली से सेंसेक्स व निफ्टी मजबूत स्थिति में कारोबार कर रहे हैं।",
         category: "business",
         source: "एनएसई/बीएसई ट्रेडिंग अपडेट",
-        searchQuery: "Indian stock market Sensex Nifty record high banking IT rally analysis"
+        searchQuery: "Indian stock market Sensex Nifty banking IT rally analysis"
       },
       {
         tempId: "f-3",
-        title: "क्रिकेट जगत में उत्सव: विश्व कप से पहले भारतीय टीम की रणनीति और नए कप्तानी फॉर्म पर गंभीर चर्चा",
-        summary: "आगामी प्रमुख टूर्नामेंट से पूर्व भारतीय क्रिकेट नियंत्रण बोर्ड (BCCI) और चयनकर्ताओं ने युवा ऑलराउंडर खिलाड़ियों को टीम में प्रमुख भूमिका देने की तैयारी की है। कोच ने कहा कि इस बार फील्डिंग और मध्यक्रम के आक्रामक खेल पर विशेष ध्यान रहेगा।",
+        title: "भारतीय खेल क्षेत्र से ताज़ा अपडेट: युवा खिलाड़ियों का शानदार प्रदर्शन और आगामी टूर्नामेंट की तैयारी",
+        summary: "भारतीय खेल प्राधिकरण और खेल संघों ने आगामी प्रमुख अंतरराष्ट्रीय प्रतियोगिताओं के लिए युवा एथलीटों का चयन प्रक्रिया पूरी कर ली है। कोचों ने टीम के प्रदर्शन पर संतोष व्यक्त किया है।",
         category: "sports",
-        source: "क्रिकेट मीडिया डेस्क",
-        searchQuery: "Team India cricket selectors dynamic lineup strategic training squad announcement"
+        source: "खेल मीडिया डेस्क",
+        searchQuery: "Team India sports tournament performance updates"
       },
       {
         tempId: "f-4",
-        title: "इसरो (ISRO) का नया मील का पत्थर: स्वदेशी रियूजेबल लॉन्च व्हीकल 'पुष्पक' का सफल स्वायत्त लैंडिंग परीक्षण",
-        summary: "भारतीय अंतरिक्ष अनुसंधान संगठन ने कर्नाटक के चित्रदुर्ग स्थित एरोनॉटिकल टेस्ट रेंज में अपने रियूजेबल लॉन्च व्हीकल (RLV) 'पुष्पक' का लगातार तीसरा सफल स्वायत्त लैंडिंग रन पूरा कर अंतरिक्ष परिवहन के भावी खर्चों को आधा करने में सफलता पाई है।",
+        title: "अंतरिक्ष व तकनीक में भारत का नया कदम: स्वदेशी स्पेस मिशन व आधुनिक लैब का सफल परीक्षण",
+        summary: "भारतीय वैज्ञानिकों और शोधकर्ताओं ने स्वदेशी तकनीक का उपयोग कर नया मुकाम हासिल किया है। इस कदम से भविष्य के तकनीकी शोधों को गति मिलेगी और वैश्विक स्तर पर पहचान मजबूत होगी।",
         category: "tech",
-        source: "इसरो बुलेटिन",
-        searchQuery: "ISRO RLV Pushpak autonomous landing flight test success chitradurga"
+        source: "विज्ञान बुलेटिन",
+        searchQuery: "ISRO space technology autonomous test success"
       }
     ];
     res.json(crawlerFallback);
@@ -1489,42 +1489,54 @@ interface ScrapedNewsItem {
 // POST /api/gemini/publish-top10-day
 app.post("/api/gemini/publish-top10-day", async (req, res) => {
   try {
+    const todayHindiDate = new Date().toLocaleDateString('hi-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+
     // 1. DELETE all old news articles in the database
     const querySnapshot = await getDocs(collection(db, "articles"));
     for (const docSnap of querySnapshot.docs) {
       await deleteDoc(doc(db, "articles", docSnap.id));
     }
-    console.log("Deleted old news articles in preparation for 21 May 2026 update.");
+    console.log(`Deleted old news articles in preparation for ${todayHindiDate} update.`);
 
     // 2. We prepare the response container
     let articlesToSave: any[] = [];
 
     try {
       const ai = getGeminiClient();
-      const systemPrompt = `You are the chief director of "SaraDesh" (सौरादेश/सारादेश.in), an elite, highly authentic Hindi digital news portal. 
-Your task is to fetch today's (May 21, 2026) top 10 breaking news headlines across India/Globe by scanning premium Indian portals/publications. 
 
-Construct exactly 10 comprehensive and fully completed journalistic reports in Hindi. 
+      // Step 1: Grounded Search for live today news
+      const searchRes = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `Search Google and gather today's top 10 breaking news headlines across India in Hindi (national, sports, business, tech, entertainment, international). Collect facts, summaries, and core story details for each of the 10 news stories.`,
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
+      });
+
+      const searchResultText = searchRes.text;
+
+      // Step 2: Convert search results to structured JSON array
+      const systemPrompt = `You are the chief director of "SaraDesh" (सौरादेश/सारादेश.in), an elite Hindi digital news portal.
+Convert the provided real-time news information into exactly 10 comprehensive and fully completed journalistic reports in Hindi. 
 Do NOT write short snippets. Each article's body must be 150-250 words long, separated into 3-4 professional paragraphs using \\n.
 
 The response MUST match this structure exactly, returned as a clean JSON array of objects:
 interface GeneratedArticle {
-  title: string; // The primary catching headline in Hindi
-  subtitle: string; // Catchy sub-headline summarizing the story in Hindi
+  title: string; // Headline in Hindi
+  subtitle: string; // Catchy sub-headline summarizing story in Hindi
   content: string; // Completely written news story with multiple paragraphs using \\n for line breaks
   category: "national" | "state" | "sports" | "entertainment" | "business" | "tech" | "lifestyle" | "international" | "job" | "education" | "religion" | "astrology";
   author: string; // Real Hindi journalist name (e.g., "नमन गुप्ता", "शालिनी ओझा")
   tags: string[]; // 4 to 5 relevant news tags in Hindi
-  imageKeyword: string; // descriptive English search query representing the core event for stock image
+  imageKeyword: string; // descriptive English search query representing core event for stock image
 }
-Do not include any extra text. Set responseMimeType to application/json.`;
+Do not include extra text. Output raw JSON array only.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: "List and fully draft the top 10 primary current news stories for Thursday, 21 May 2026 in India. Create a completely styled JSON array of 10 fully complete news articles.",
+        model: "gemini-2.5-flash",
+        contents: `Format these news items into a JSON array of 10 complete news articles according to schema:\n\n${searchResultText}`,
         config: {
           systemInstruction: systemPrompt,
-          tools: [{ googleSearch: {} }],
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.ARRAY,
@@ -1550,7 +1562,7 @@ Do not include any extra text. Set responseMimeType to application/json.`;
 
       const parsedArray = JSON.parse(response.text.trim());
       if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-        articlesToSave = parsedArray.map((item: any, idx: number) => {
+        articlesToSave = parsedArray.map((item: any) => {
           let imageUrl = "https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=800&auto=format&fit=crop";
           if (item.imageKeyword) {
             const kw = item.imageKeyword.toLowerCase();
@@ -1579,7 +1591,7 @@ Do not include any extra text. Set responseMimeType to application/json.`;
             category: item.category || "national",
             image: imageUrl,
             author: item.author || "विशेष संवाददाता, नई दिल्ली",
-            date: "21 मई 2026",
+            date: todayHindiDate,
             tags: item.tags || ["ताज़ा समाचार", "देश विदेश"],
             readTime: Math.max(3, Math.min(10, Math.floor(item.content.length / 120))),
             views: Math.floor(Math.random() * 800) + 200,
@@ -1668,7 +1680,7 @@ You MUST return a JSON array conforming to this schema:
 Return a valid JSON array only. Set responseMimeType to application/json.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `Look over this raw material and compile it into multiple completed news items systematically:\n\n${rawMaterial}`,
       config: {
         systemInstruction: systemPrompt,
@@ -1797,7 +1809,7 @@ Return a clean JSON array only.`
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: { parts: [imagePart, textPart] },
       config: {
         responseMimeType: "application/json",
@@ -1967,7 +1979,7 @@ For each story:
 7. Set a professional Hindi author name.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: searchPrompt,
       config: {
         tools: [{ googleSearch: {} }] // Simpler text generation with search grounding fallback
@@ -1997,7 +2009,7 @@ Schema:
 ]`;
 
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `Parse these scraped news articles text and output them as a JSON array according to the schema:
       
       ${outputText}`,
@@ -2496,7 +2508,7 @@ app.post("/api/gemini/generate", async (req, res) => {
     - Keep everything in proper Hindi language (Devanagari script), using technical and common terms naturally.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: `कृप्या इस विषय पर सारादेश.in की गंभीर एवं विश्वसनीय हिंदी पत्रकारिता शैली में एक बेहतरीन हिंदी खबर का प्रारूप तैयार करें: "${prompt}". श्रेणी: "${category || 'सामान्य'}". राज्य: "${state || 'सामान्य'}".`,
       config: {
         systemInstruction: systemPrompt,
@@ -2578,27 +2590,36 @@ app.post("/api/gemini/autopilot", async (req, res) => {
     // Pick a random topic to keep the automated feed extremely realistic, fresh and non-repetitive
     const chosenTopic = topics[Math.floor(Math.random() * topics.length)];
 
+    // Step 1: Perform real-time search grounding for the chosen topic
+    const searchRes = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Search Google for the latest breaking news today in India/Globe about: "${chosenTopic.prompt}". Get facts, quotes, dates, and full story details.`,
+      config: {
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const searchOutput = searchRes.text;
+
+    // Step 2: Format into structured JSON article
     const systemPrompt = `You are the lead editor at "सारादेश.in" (Sara Desh Hindi News Portal).
-    Your job is to write a highly compelling, authentic, detailed and completely written Hindi news article.
-    Use Google Search grounding tool to look up actual, true, real-day events about this category: "${chosenTopic.category}" in India/Globe. Write a genuine news article, never mock or simulated statements.
+    Your job is to write a highly compelling, authentic, detailed and completely written Hindi news article based on the provided search results.
     
     The response MUST be a valid JSON object in Hindi matching the schema provided.
     
     Ensure:
-    - Title: A powerful Hindi headline (headline).
+    - Title: A powerful Hindi headline.
     - Subtitle: A catchy single-sentence hook summarizing the news.
     - Content: The complete article body in Hindi, divided into 3-4 paragraphs using \\n for spacing, including quotes, facts and dates.
-    - ImageKeyword: A descriptive 2-4 word English search query keyword (e.g. "isro satellite lunch" or "mumbai gold bullion") to fetch Unsplash standard photo.
+    - ImageKeyword: A descriptive 2-4 word English search query keyword (e.g. "isro satellite launch" or "mumbai stock market") to fetch standard photo.
     - Tags: 3 to 5 realistic Devanagari news tags.
     - Author: A highly realistic journalist name (e.g. "रोहित शर्मा", "प्रिया सिन्हा", "अजय बाजपेयी").`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: `Search Google for the latest actual news regarding this topic and use that context to draft a full article: "${chosenTopic.prompt}". Category limit to: "${chosenTopic.category}".`,
+      model: "gemini-2.5-flash",
+      contents: `Draft a full news article in JSON format based on these real news search results for category "${chosenTopic.category}":\n\n${searchOutput}`,
       config: {
         systemInstruction: systemPrompt,
-        // Using Google Search grounding to retrieve current real news events automatically!
-        tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
