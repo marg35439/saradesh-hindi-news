@@ -9,12 +9,15 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
     ],
+    css: {
+      devSourcemap: false,
+    },
     build: {
-      target: ['es2018', 'chrome80', 'firefox78', 'safari13', 'edge80'],
-      cssTarget: ['chrome80', 'firefox78', 'safari13', 'edge80'],
+      target: ['es2017', 'chrome79', 'firefox78', 'safari13', 'edge79'],
+      cssTarget: ['chrome79', 'firefox78', 'safari13', 'edge79'],
     },
     esbuild: {
-      target: 'es2018',
+      target: 'es2017',
     },
     resolve: {
       alias: {
