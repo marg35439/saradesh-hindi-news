@@ -2,14 +2,12 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
-import { legacyCssCompatPlugin } from './vite-plugin-css-compat';
 
 export default defineConfig(() => {
   return {
     plugins: [
       react(),
       tailwindcss(),
-      legacyCssCompatPlugin(),
     ],
     css: {
       devSourcemap: false,
