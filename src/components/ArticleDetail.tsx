@@ -71,14 +71,25 @@ export default function ArticleDetail({
       setRelatedArticles(finalRelated);
     };
 
-    if (allArticles && allArticles.length > 0) {
-      prepareRelated(allArticles);
-    } else {
-      fetchNewsList("all")
-        .then((items) => prepareRelated(items))
-        .catch((err) => console.error("Error fetching related news:", err));
-    }
-  }, [article, articleId, allArticles]);
+    // ALWAYS fetch all site articles to build a rich related news list, even if opened from a single category
+    fetchNewsList("all")
+      .then((items) => {
+        if (items && items.length > 0) {
+          const combinedMap = new Map<string, Article>();
+          (allArticles || []).forEach(a => combinedMap.set(a.id, a));
+          items.forEach(a => combinedMap.set(a.id, a));
+          prepareRelated(Array.from(combinedMap.values()));
+        } else if (allArticles && allArticles.length > 0) {
+          prepareRelated(allArticles);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching related news:", err);
+        if (allArticles && allArticles.length > 0) {
+          prepareRelated(allArticles);
+        }
+      });
+  }, [article, articleId]);
 
   const handleLike = () => {
     if (hasLiked) return;

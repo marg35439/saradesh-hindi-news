@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Newspaper, Flame, Heart, MessageSquare, Eye, ArrowRight, CornerDownRight, RefreshCw, Layers, Check, ThumbsUp, MapPin, Sun, Award, HelpCircle, Cloud, CloudRain, CloudSun, Grid, ListFilter, Bookmark, Radio, Briefcase, GraduationCap, Sparkles, Landmark, Compass, ChevronRight, Shield } from "lucide-react";
+import { Newspaper, Flame, Heart, MessageSquare, Eye, ArrowRight, CornerDownRight, RefreshCw, Layers, Check, ThumbsUp, MapPin, Sun, Award, HelpCircle, Cloud, CloudRain, CloudSun, Grid, ListFilter, Bookmark, Radio, Briefcase, GraduationCap, Sparkles, Landmark, Compass, ChevronRight, Shield, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import BreakingNews from "./components/BreakingNews";
@@ -330,6 +330,61 @@ export default function App() {
         />
       )}
 
+      {/* 3.5 Stock Market Live Ticker Bar (Main Page Only) */}
+      {!isAdminMode && !selectedArticleId && selectedCategory === "all" && !searchQuery && (
+        <div className="bg-slate-950 text-white border-y border-emerald-500/30 py-2 px-4 shadow-sm overflow-hidden font-sans">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shrink-0 shadow-xs">
+              <TrendingUp className="w-3.5 h-3.5 animate-pulse" />
+              <span>शेयर बाज़ार (LIVE)</span>
+            </div>
+            
+            {/* Ticker marquee / scrollable items */}
+            <div className="overflow-x-auto no-scrollbar flex items-center gap-3 text-xs py-0.5">
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                <span className="font-bold text-neutral-300">BSE SENSEX:</span>
+                <span className="font-extrabold text-white font-mono">81,842.30</span>
+                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                  ▲ +412.20 (+0.51%)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                <span className="font-bold text-neutral-300">NSE NIFTY 50:</span>
+                <span className="font-extrabold text-white font-mono">24,960.45</span>
+                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                  ▲ +134.10 (+0.54%)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                <span className="font-bold text-neutral-300">BANK NIFTY:</span>
+                <span className="font-extrabold text-white font-mono">52,280.10</span>
+                <span className="text-[10px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                  ▼ -62.40 (-0.12%)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                <span className="font-bold text-amber-300">GOLD (24K/10g):</span>
+                <span className="font-extrabold text-white font-mono">₹74,850</span>
+                <span className="text-[10px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.2 rounded">
+                  ▼ -120
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
+                <span className="font-bold text-neutral-300">SILVER (1kg):</span>
+                <span className="font-extrabold text-white font-mono">₹89,200</span>
+                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">
+                  ▲ +450
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. MAIN LAYOUT AND VIEW SWITCHING */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 md:py-8">
         <AnimatePresence mode="wait">
@@ -615,328 +670,404 @@ export default function App() {
                 )}
               </div>
 
-              {/* SECONDARY SIDEBAR BLOCK: Weather ticker and Trending list on right */}
+              {/* SECONDARY SIDEBAR BLOCK: Weather ticker, Stock Market, Special blocks & Poll on right (MAIN PAGE ONLY) */}
               <div className="lg:col-span-4 space-y-6">
                 
-                {/* 1. Live State Weather Marquee Ticker Card */}
-                <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-neutral-900 text-white rounded-2xl p-3.5 shadow-lg border border-amber-500/30 relative overflow-hidden group">
-                  <div className="flex items-center justify-between pb-2 mb-1 border-b border-white/10 px-0.5">
-                    <div className="flex items-center gap-2">
-                      <div className="relative w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
-                        <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                {/* All secondary sidebar blocks render ONLY on main Home tab */}
+                {selectedCategory === "all" && (
+                  <>
+                    {/* 1. Live Sensex & Nifty Stock Market Tracker Card */}
+                    <div className="bg-gradient-to-br from-slate-900 via-zinc-900 to-neutral-950 text-white rounded-2xl p-4 shadow-xl border border-emerald-500/30 space-y-3 relative overflow-hidden group">
+                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-400 border border-emerald-500/30">
+                            <TrendingUp className="w-4 h-4 text-emerald-400 animate-pulse" />
+                          </div>
+                          <div>
+                            <h3 className="text-xs sm:text-sm font-black uppercase text-emerald-400 tracking-wider font-sans">
+                              📈 शेयर बाज़ार लाइव अपडेट (MARKET)
+                            </h3>
+                            <p className="text-[10px] text-neutral-400 font-sans">बीएससी सेंसेक्स एवं एनएसई निफ्टी 50</p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full font-sans uppercase animate-pulse tracking-wider">
+                          LIVE BAZAR
+                        </span>
                       </div>
-                      <span className="text-xs font-black uppercase text-amber-400 tracking-wide font-sans">
-                        राज्यवार लाइव मौसम बुलेटिन
-                      </span>
-                    </div>
-                    <span className="text-[9px] bg-red-600 text-white font-extrabold px-2 py-0.5 rounded-full font-sans uppercase animate-pulse tracking-wider">
-                      LIVE TICKER
-                    </span>
-                  </div>
 
-                  {/* Infinite Marquee Ticker */}
-                  <div className="overflow-hidden relative w-full bg-black/40 rounded-xl py-2.5 border border-white/10">
-                    <div className="animate-marquee flex items-center gap-3">
-                      {(() => {
-                        const weatherList = Object.keys(sidebarWeather).length > 0 
-                          ? Object.entries(sidebarWeather).map(([city, info]) => {
-                              const w = info as { temp: number; text: string; icon: string };
-                              return { city, temp: w.temp, text: w.text, icon: w.icon };
-                            })
-                          : [
-                              { city: "दिल्ली", temp: 42, text: "भीषण गर्मी (लू)", icon: "Sun" },
-                              { city: "मुंबई", temp: 33, text: "उमस भरा", icon: "Cloud" },
-                              { city: "जयपुर", temp: 44, text: "सूरज तप रहा", icon: "Sun" },
-                              { city: "लखनऊ", temp: 41, text: "गर्म हवाएं", icon: "Sun" },
-                              { city: "पटना", temp: 40, text: "तेज धूप", icon: "Sun" },
-                              { city: "भोपाल", temp: 39, text: "बादल छाए", icon: "CloudSun" },
-                              { city: "रांची", temp: 36, text: "सुहावना", icon: "Cloud" }
-                            ];
-                        
-                        // Repeat list for seamless ticker loop
-                        const doubledList = [...weatherList, ...weatherList, ...weatherList];
-
-                        return doubledList.map((item, idx) => (
-                          <div 
-                            key={`${item.city}-${idx}`}
-                            onClick={() => handleStateSelect(item.city)}
-                            className="flex items-center gap-1.5 bg-white/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-xl border border-white/15 shrink-0 cursor-pointer transition-colors shadow-xs"
-                          >
-                            <span className="text-xs font-black text-amber-300">{item.city}:</span>
-                            <span className="text-xs font-black text-white font-sans">{item.temp}°C</span>
-                            <span className="text-[10px] text-neutral-300 font-sans font-medium bg-black/40 px-1.5 py-0.2 rounded border border-white/5">
-                              {item.text}
-                            </span>
+                      {/* Stock Cards Grid */}
+                      <div className="grid grid-cols-2 gap-2.5 font-sans pt-1">
+                        {/* Sensex */}
+                        <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">BSE SENSEX</div>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">81,842.30</div>
+                          <div className="text-[10px] font-black text-emerald-400 flex items-center gap-0.5 mt-0.5">
+                            <TrendingUp className="w-3 h-3" />
+                            <span>+412.20 (+0.51%)</span>
                           </div>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. THREE VIBRANT & COLORFUL VERTICAL CATEGORIES: Sarkari Naukri, Jyotish/Rashifal, Sarkari Yojna */}
-                
-                {/* CATEGORY 1: सरकारी नौकरी एवं करियर */}
-                <div className="bg-gradient-to-b from-blue-50/50 via-indigo-50/30 to-white border-2 border-blue-200/90 rounded-2xl overflow-hidden shadow-md">
-                  <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-600 text-white p-3.5 flex items-center justify-between shadow-sm">
-                    <h3 
-                      onClick={() => handleCategorySelect('job')}
-                      className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-cyan-200 transition-colors"
-                    >
-                      <Briefcase className="w-5 h-5 text-cyan-300" />
-                      <span>💼 सरकारी नौकरी (SARKARI NAUKRI)</span>
-                    </h3>
-                    <button
-                      onClick={() => handleCategorySelect('job')}
-                      className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
-                    >
-                      सभी देखें ➔
-                    </button>
-                  </div>
-
-                  <div className="p-3 space-y-2.5">
-                    {(() => {
-                      const jobArts = articles.filter(a => a.category === "job" || a.category === "jobs");
-                      if (jobArts.length === 0) {
-                        return (
-                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
-                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
-                          </div>
-                        );
-                      }
-                      return jobArts.slice(0, 4).map((art) => (
-                        <div 
-                          key={art.id}
-                          onClick={() => handleArticleClick(art)}
-                          className="bg-white border border-blue-150 hover:border-blue-400 rounded-xl p-3 cursor-pointer group hover:bg-blue-50/60 shadow-2xs transition-all duration-200"
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-blue-600 text-white font-sans">
-                              {art.tags?.[0] || 'सरकारी नौकरी'}
-                            </span>
-                            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100/80 px-1.5 py-0.2 rounded font-sans">
-                              📅 {art.date}
-                            </span>
-                          </div>
-                          <h4 className="text-sm font-black leading-snug text-blue-900 group-hover:text-blue-700 transition-colors line-clamp-2">
-                            {art.title}
-                          </h4>
                         </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
 
-                {/* CATEGORY 2: दैनिक राशिफल एवं ज्योतिष */}
-                <div className="bg-gradient-to-b from-purple-50/50 via-fuchsia-50/30 to-white border-2 border-purple-200/90 rounded-2xl overflow-hidden shadow-md">
-                  <div className="bg-gradient-to-r from-purple-800 via-fuchsia-800 to-pink-700 text-white p-3.5 flex items-center justify-between shadow-sm">
-                    <h3 
-                      onClick={() => handleCategorySelect('astrology')}
-                      className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-pink-200 transition-colors"
-                    >
-                      <Sparkles className="w-5 h-5 text-amber-300 animate-spin-slow" />
-                      <span>🔮 दैनिक राशिफल व ज्योतिष (ASTROLOGY)</span>
-                    </h3>
-                    <button
-                      onClick={() => handleCategorySelect('astrology')}
-                      className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
-                    >
-                      सभी देखें ➔
-                    </button>
-                  </div>
-
-                  <div className="p-3 space-y-2.5">
-                    {(() => {
-                      const astroArts = articles.filter(a => a.category === "astrology" || a.category === "astro");
-                      if (astroArts.length === 0) {
-                        return (
-                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
-                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                        {/* Nifty 50 */}
+                        <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">NSE NIFTY 50</div>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">24,960.45</div>
+                          <div className="text-[10px] font-black text-emerald-400 flex items-center gap-0.5 mt-0.5">
+                            <TrendingUp className="w-3 h-3" />
+                            <span>+134.10 (+0.54%)</span>
                           </div>
-                        );
-                      }
-                      return astroArts.slice(0, 4).map((art) => (
-                        <div 
-                          key={art.id}
-                          onClick={() => handleArticleClick(art)}
-                          className="bg-white border border-purple-150 hover:border-purple-400 rounded-xl p-3 cursor-pointer group hover:bg-purple-50/60 shadow-2xs transition-all duration-200"
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-purple-600 text-white font-sans">
-                              {art.tags?.[0] || 'ज्योतिष'}
-                            </span>
-                            <span className="text-[9px] font-extrabold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded font-sans">
-                              ✨ {art.date}
-                            </span>
-                          </div>
-                          <h4 className="text-sm font-black leading-snug text-purple-900 group-hover:text-purple-700 transition-colors line-clamp-2">
-                            {art.title}
-                          </h4>
                         </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
 
-                {/* CATEGORY 3: सरकारी योजनाएँ एवं जन कल्याण */}
-                <div className="bg-gradient-to-b from-emerald-50/50 via-teal-50/30 to-white border-2 border-emerald-200/90 rounded-2xl overflow-hidden shadow-md">
-                  <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-green-600 text-white p-3.5 flex items-center justify-between shadow-sm">
-                    <h3 
-                      onClick={() => handleCategorySelect('schemes')}
-                      className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-yellow-200 transition-colors"
-                    >
-                      <Landmark className="w-5 h-5 text-yellow-300" />
-                      <span>📜 सरकारी योजनाएँ (GOVT SCHEMES)</span>
-                    </h3>
-                    <button
-                      onClick={() => handleCategorySelect('schemes')}
-                      className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
-                    >
-                      सभी देखें ➔
-                    </button>
-                  </div>
-
-                  <div className="p-3 space-y-2.5">
-                    {(() => {
-                      const schemeArts = articles.filter(a => a.category === "schemes" || a.category === "scheme" || a.category === "yojna");
-                      if (schemeArts.length === 0) {
-                        return (
-                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
-                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                        {/* Bank Nifty */}
+                        <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
+                          <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">NIFTY BANK</div>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">52,280.10</div>
+                          <div className="text-[10px] font-black text-rose-400 flex items-center gap-0.5 mt-0.5">
+                            <TrendingDown className="w-3 h-3" />
+                            <span>-62.40 (-0.12%)</span>
                           </div>
-                        );
-                      }
-                      return schemeArts.slice(0, 4).map((art) => (
-                        <div 
-                          key={art.id}
-                          onClick={() => handleArticleClick(art)}
-                          className="bg-white border border-emerald-150 hover:border-emerald-400 rounded-xl p-3 cursor-pointer group hover:bg-emerald-50/60 shadow-2xs transition-all duration-200"
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-emerald-600 text-white font-sans">
-                              {art.tags?.[0] || 'सरकारी योजना'}
-                            </span>
-                            <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded font-sans">
-                              📜 {art.date}
-                            </span>
-                          </div>
-                          <h4 className="text-sm font-black leading-snug text-emerald-900 group-hover:text-emerald-700 transition-colors line-clamp-2">
-                            {art.title}
-                          </h4>
                         </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
 
-                {/* 3. Interactive OPINION POLL CARD (Vibrant Rang-Biranga Design) */}
-                <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 rounded-2xl p-5 shadow-xl text-white border border-purple-500/30 space-y-3 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
-                  
-                  <div className="flex items-center gap-2 border-b pb-3 border-purple-500/30">
-                    <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-2 rounded-xl text-slate-950 font-black shadow-md animate-bounce">
-                      <HelpCircle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-300 to-cyan-300">
-                        📊 जनमत सर्वेक्षण (OPINION POLL-2026)
-                      </h3>
-                      <p className="text-[10px] text-purple-200 font-sans">अपनी राय ज़रूर व्यक्त करें</p>
-                    </div>
-                  </div>
+                        {/* Gold */}
+                        <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
+                          <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">सोना 24K (10g)</div>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">₹74,850</div>
+                          <div className="text-[10px] font-black text-rose-400 flex items-center gap-0.5 mt-0.5">
+                            <TrendingDown className="w-3 h-3" />
+                            <span>-120 (-0.16%)</span>
+                          </div>
+                        </div>
+                      </div>
 
-                  <p className="text-xs font-bold text-white leading-relaxed font-sans mt-1 bg-white/10 p-3 rounded-xl border border-white/15 shadow-inner">
-                    प्रश्न: क्या आपको लगता है कि वंदे भारत स्लीपर और अन्य नई एक्सप्रेस ट्रेनों से आम जनता का भारतीय रेलवे में सफर सुगम और बेहतर बनेगा?
-                  </p>
-
-                  {!hasVoted ? (
-                    <div className="space-y-2 pt-1 font-sans">
-                      {[
-                        { key: "A", text: "हाँ, यह स्वदेशी रेलवे विकास का बेहतरीन उदाहरण है", color: "from-emerald-500 to-teal-600" },
-                        { key: "B", text: "नहीं, किराए और साधारण/स्लीपर डिब्बों की संख्या सुधारनी होगी", color: "from-rose-500 to-red-600" },
-                        { key: "C", text: "कह नहीं सकते / समीक्षा आवश्यक है", color: "from-amber-500 to-orange-600" }
-                      ].map((opt) => (
-                        <button
-                          key={opt.key}
-                          onClick={() => setSelectedOption(opt.key)}
-                          className={`w-full text-left p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2.5 ${
-                            selectedOption === opt.key
-                              ? "border-amber-400 bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-amber-200 shadow-md scale-101 ring-1 ring-amber-400"
-                              : "border-purple-400/30 bg-white/5 hover:bg-white/15 text-purple-100"
-                          }`}
-                        >
-                          <span className={`w-5 h-5 rounded-lg font-black flex items-center justify-center text-[10px] shrink-0 text-white bg-gradient-to-br ${opt.color} shadow-xs`}>
-                            {opt.key}
-                          </span>
-                          <span>{opt.text}</span>
-                        </button>
-                      ))}
-
-                      <button
-                        disabled={!selectedOption}
-                        onClick={() => selectedOption && handleVoteSubmit(selectedOption)}
-                        className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wider uppercase transition-all shadow-lg select-none mt-2 cursor-pointer ${
-                          selectedOption
-                            ? "bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 text-slate-950 hover:brightness-110 shadow-amber-500/20"
-                            : "bg-white/10 text-white/40 border border-white/10 cursor-not-allowed"
-                        }`}
+                      <button 
+                        onClick={() => handleCategorySelect('business')}
+                        className="w-full py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-[11px] font-black uppercase font-sans tracking-wide transition-all cursor-pointer flex items-center justify-center gap-1"
                       >
-                        अपना वोट दर्ज करें (Cast Vote)
+                        <span>बिज़नेस और शेयर बाजार की खबरें देखें</span>
+                        <span>➔</span>
                       </button>
                     </div>
-                  ) : (
-                    <div className="space-y-3 pt-1 font-sans animate-fade-in">
-                      {[
-                        { key: "A", text: "हाँ, यह विकास का मील का पत्थर है", basePct: 62, barColor: "from-emerald-400 to-teal-500" },
-                        { key: "B", text: "नहीं, किराए और डिब्बों पर ध्यान देना होगा", basePct: 29, barColor: "from-rose-400 to-red-500" },
-                        { key: "C", text: "कह नहीं सकते / अन्य विचार", basePct: 9, barColor: "from-amber-400 to-orange-500" }
-                      ].map((opt) => {
-                        const total = (Object.values(pollVotes) as number[]).reduce((a, b) => a + b, 0);
-                        const votes = (pollVotes[opt.key] as number) || 0;
-                        const pct = Math.round((votes / (total || 1)) * 100);
-                        const isUserChoice = selectedOption === opt.key;
 
-                        return (
-                          <div key={opt.key} className="space-y-1 bg-white/5 p-2 rounded-lg border border-white/10">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className={`font-semibold ${isUserChoice ? "text-amber-300 font-black" : "text-purple-100"}`}>
-                                {opt.text} {isUserChoice && <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black ml-1">आपका जवाब</span>}
-                              </span>
-                              <span className="font-extrabold text-amber-300 font-mono">{pct}%</span>
-                            </div>
-                            <div className="w-full bg-slate-950/80 h-2.5 rounded-full overflow-hidden relative border border-white/10">
-                              <div
-                                style={{ width: `${pct}%` }}
-                                className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${opt.barColor}`}
-                              ></div>
-                            </div>
-                            <div className="text-[9px] text-purple-300 flex justify-between">
-                              <span>कुल वोट: {votes.toLocaleString()}</span>
-                            </div>
+                    {/* 2. Live State Weather Marquee Ticker Card */}
+                    <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-neutral-900 text-white rounded-2xl p-3.5 shadow-lg border border-amber-500/30 relative overflow-hidden group">
+                      <div className="flex items-center justify-between pb-2 mb-1 border-b border-white/10 px-0.5">
+                        <div className="flex items-center gap-2">
+                          <div className="relative w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+                            <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
                           </div>
-                        );
-                      })}
+                          <span className="text-xs font-black uppercase text-amber-400 tracking-wide font-sans">
+                            राज्यवार लाइव मौसम बुलेटिन
+                          </span>
+                        </div>
+                        <span className="text-[9px] bg-red-600 text-white font-extrabold px-2 py-0.5 rounded-full font-sans uppercase animate-pulse tracking-wider">
+                          LIVE TICKER
+                        </span>
+                      </div>
 
-                      <div className="bg-emerald-500/20 rounded-xl p-2.5 border border-emerald-400/40 flex items-center gap-1.5 text-xs text-emerald-300 font-bold justify-center">
-                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>वोटिंग के लिए धन्यवाद! सर्वे लाइव है।</span>
+                      {/* Infinite Marquee Ticker */}
+                      <div className="overflow-hidden relative w-full bg-black/40 rounded-xl py-2.5 border border-white/10">
+                        <div className="animate-marquee flex items-center gap-3">
+                          {(() => {
+                            const weatherList = Object.keys(sidebarWeather).length > 0 
+                              ? Object.entries(sidebarWeather).map(([city, info]) => {
+                                  const w = info as { temp: number; text: string; icon: string };
+                                  return { city, temp: w.temp, text: w.text, icon: w.icon };
+                                })
+                              : [
+                                  { city: "दिल्ली", temp: 42, text: "भीषण गर्मी (लू)", icon: "Sun" },
+                                  { city: "मुंबई", temp: 33, text: "उमस भरा", icon: "Cloud" },
+                                  { city: "जयपुर", temp: 44, text: "सूरज तप रहा", icon: "Sun" },
+                                  { city: "लखनऊ", temp: 41, text: "गर्म हवाएं", icon: "Sun" },
+                                  { city: "पटना", temp: 40, text: "तेज धूप", icon: "Sun" },
+                                  { city: "भोपाल", temp: 39, text: "बादल छाए", icon: "CloudSun" },
+                                  { city: "रांची", temp: 36, text: "सुहावना", icon: "Cloud" }
+                                ];
+                            
+                            // Repeat list for seamless ticker loop
+                            const doubledList = [...weatherList, ...weatherList, ...weatherList];
+
+                            return doubledList.map((item, idx) => (
+                              <div 
+                                key={`${item.city}-${idx}`}
+                                onClick={() => handleStateSelect(item.city)}
+                                className="flex items-center gap-1.5 bg-white/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-xl border border-white/15 shrink-0 cursor-pointer transition-colors shadow-xs"
+                              >
+                                <span className="text-xs font-black text-amber-300">{item.city}:</span>
+                                <span className="text-xs font-black text-white font-sans">{item.temp}°C</span>
+                                <span className="text-[10px] text-neutral-300 font-sans font-medium bg-black/40 px-1.5 py-0.2 rounded border border-white/5">
+                                  {item.text}
+                                </span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* 4. Sidebar Google AdSense Block Placeholders */}
-                <div className="border border-dashed border-amber-500/30 rounded-2xl p-4 bg-amber-500/[0.02] text-center select-none space-y-2">
-                  <div className="text-[10px] font-extrabold text-amber-600 tracking-wider">
-                    ⚡ GOOGLE ADSENSE SIDEBAR BANNER (300x250)
-                  </div>
-                  <div className="bg-neutral-50 border border-neutral-150 h-40 rounded flex items-center justify-center text-neutral-400 text-xs font-sans">
-                    विज्ञापन यहाँ प्रसारित होगा
-                  </div>
-                  <p className="text-[9px] text-neutral-400 font-sans leading-relaxed">
-                    Theme is optimized for maximum ad revenue CTR
-                  </p>
-                </div>
+                    {/* 3. THREE VIBRANT & COLORFUL VERTICAL CATEGORIES: Sarkari Naukri, Jyotish/Rashifal, Sarkari Yojna */}
+                    
+                    {/* CATEGORY 1: सरकारी नौकरी एवं करियर */}
+                    <div className="bg-gradient-to-b from-blue-50/50 via-indigo-50/30 to-white border-2 border-blue-200/90 rounded-2xl overflow-hidden shadow-md">
+                      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-600 text-white p-3.5 flex items-center justify-between shadow-sm">
+                        <h3 
+                          onClick={() => handleCategorySelect('job')}
+                          className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-cyan-200 transition-colors"
+                        >
+                          <Briefcase className="w-5 h-5 text-cyan-300" />
+                          <span>💼 सरकारी नौकरी (SARKARI NAUKRI)</span>
+                        </h3>
+                        <button
+                          onClick={() => handleCategorySelect('job')}
+                          className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
+                        >
+                          सभी देखें ➔
+                        </button>
+                      </div>
+
+                      <div className="p-3 space-y-2.5">
+                        {(() => {
+                          const jobArts = articles.filter(a => a.category === "job" || a.category === "jobs");
+                          if (jobArts.length === 0) {
+                            return (
+                              <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                                इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                              </div>
+                            );
+                          }
+                          return jobArts.slice(0, 4).map((art) => (
+                            <div 
+                              key={art.id}
+                              onClick={() => handleArticleClick(art)}
+                              className="bg-white border border-blue-150 hover:border-blue-400 rounded-xl p-3 cursor-pointer group hover:bg-blue-50/60 shadow-2xs transition-all duration-200"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-blue-600 text-white font-sans">
+                                  {art.tags?.[0] || 'सरकारी नौकरी'}
+                                </span>
+                                <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100/80 px-1.5 py-0.2 rounded font-sans">
+                                  📅 {art.date}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-black leading-snug text-blue-900 group-hover:text-blue-700 transition-colors line-clamp-2">
+                                {art.title}
+                              </h4>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* CATEGORY 2: दैनिक राशिफल एवं ज्योतिष */}
+                    <div className="bg-gradient-to-b from-purple-50/50 via-fuchsia-50/30 to-white border-2 border-purple-200/90 rounded-2xl overflow-hidden shadow-md">
+                      <div className="bg-gradient-to-r from-purple-800 via-fuchsia-800 to-pink-700 text-white p-3.5 flex items-center justify-between shadow-sm">
+                        <h3 
+                          onClick={() => handleCategorySelect('astrology')}
+                          className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-pink-200 transition-colors"
+                        >
+                          <Sparkles className="w-5 h-5 text-amber-300 animate-spin-slow" />
+                          <span>🔮 दैनिक राशिफल व ज्योतिष (ASTROLOGY)</span>
+                        </h3>
+                        <button
+                          onClick={() => handleCategorySelect('astrology')}
+                          className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
+                        >
+                          सभी देखें ➔
+                        </button>
+                      </div>
+
+                      <div className="p-3 space-y-2.5">
+                        {(() => {
+                          const astroArts = articles.filter(a => a.category === "astrology" || a.category === "astro");
+                          if (astroArts.length === 0) {
+                            return (
+                              <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                                इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                              </div>
+                            );
+                          }
+                          return astroArts.slice(0, 4).map((art) => (
+                            <div 
+                              key={art.id}
+                              onClick={() => handleArticleClick(art)}
+                              className="bg-white border border-purple-150 hover:border-purple-400 rounded-xl p-3 cursor-pointer group hover:bg-purple-50/60 shadow-2xs transition-all duration-200"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-purple-600 text-white font-sans">
+                                  {art.tags?.[0] || 'ज्योतिष'}
+                                </span>
+                                <span className="text-[9px] font-extrabold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded font-sans">
+                                  ✨ {art.date}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-black leading-snug text-purple-900 group-hover:text-purple-700 transition-colors line-clamp-2">
+                                {art.title}
+                              </h4>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* CATEGORY 3: सरकारी योजनाएँ एवं जन कल्याण */}
+                    <div className="bg-gradient-to-b from-emerald-50/50 via-teal-50/30 to-white border-2 border-emerald-200/90 rounded-2xl overflow-hidden shadow-md">
+                      <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-green-600 text-white p-3.5 flex items-center justify-between shadow-sm">
+                        <h3 
+                          onClick={() => handleCategorySelect('schemes')}
+                          className="text-sm sm:text-base font-black flex items-center gap-2 tracking-wide cursor-pointer hover:text-yellow-200 transition-colors"
+                        >
+                          <Landmark className="w-5 h-5 text-yellow-300" />
+                          <span>📜 सरकारी योजनाएँ (GOVT SCHEMES)</span>
+                        </h3>
+                        <button
+                          onClick={() => handleCategorySelect('schemes')}
+                          className="text-[10px] font-black uppercase bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg border border-white/30 transition-all cursor-pointer font-sans"
+                        >
+                          सभी देखें ➔
+                        </button>
+                      </div>
+
+                      <div className="p-3 space-y-2.5">
+                        {(() => {
+                          const schemeArts = articles.filter(a => a.category === "schemes" || a.category === "scheme" || a.category === "yojna");
+                          if (schemeArts.length === 0) {
+                            return (
+                              <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                                इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                              </div>
+                            );
+                          }
+                          return schemeArts.slice(0, 4).map((art) => (
+                            <div 
+                              key={art.id}
+                              onClick={() => handleArticleClick(art)}
+                              className="bg-white border border-emerald-150 hover:border-emerald-400 rounded-xl p-3 cursor-pointer group hover:bg-emerald-50/60 shadow-2xs transition-all duration-200"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-emerald-600 text-white font-sans">
+                                  {art.tags?.[0] || 'सरकारी योजना'}
+                                </span>
+                                <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded font-sans">
+                                  📜 {art.date}
+                                </span>
+                              </div>
+                              <h4 className="text-sm font-black leading-snug text-emerald-900 group-hover:text-emerald-700 transition-colors line-clamp-2">
+                                {art.title}
+                              </h4>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* 4. Interactive OPINION POLL CARD (Vibrant Rang-Biranga Design) */}
+                    <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 rounded-2xl p-5 shadow-xl text-white border border-purple-500/30 space-y-3 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                      
+                      <div className="flex items-center gap-2 border-b pb-3 border-purple-500/30">
+                        <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-2 rounded-xl text-slate-950 font-black shadow-md animate-bounce">
+                          <HelpCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-pink-300 to-cyan-300">
+                            📊 जनमत सर्वेक्षण (OPINION POLL-2026)
+                          </h3>
+                          <p className="text-[10px] text-purple-200 font-sans">अपनी राय ज़रूर व्यक्त करें</p>
+                        </div>
+                      </div>
+
+                      <p className="text-xs font-bold text-white leading-relaxed font-sans mt-1 bg-white/10 p-3 rounded-xl border border-white/15 shadow-inner">
+                        प्रश्न: क्या आपको लगता है कि वंदे भारत स्लीपर और अन्य नई एक्सप्रेस ट्रेनों से आम जनता का भारतीय रेलवे में सफर सुगम और बेहतर बनेगा?
+                      </p>
+
+                      {!hasVoted ? (
+                        <div className="space-y-2 pt-1 font-sans">
+                          {[
+                            { key: "A", text: "हाँ, यह स्वदेशी रेलवे विकास का बेहतरीन उदाहरण है", color: "from-emerald-500 to-teal-600" },
+                            { key: "B", text: "नहीं, किराए और साधारण/स्लीपर डिब्बों की संख्या सुधारनी होगी", color: "from-rose-500 to-red-600" },
+                            { key: "C", text: "कह नहीं सकते / समीक्षा आवश्यक है", color: "from-amber-500 to-orange-600" }
+                          ].map((opt) => (
+                            <button
+                              key={opt.key}
+                              onClick={() => setSelectedOption(opt.key)}
+                              className={`w-full text-left p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2.5 ${
+                                selectedOption === opt.key
+                                  ? "border-amber-400 bg-gradient-to-r from-amber-500/30 to-orange-500/30 text-amber-200 shadow-md scale-101 ring-1 ring-amber-400"
+                                  : "border-purple-400/30 bg-white/5 hover:bg-white/15 text-purple-100"
+                              }`}
+                            >
+                              <span className={`w-5 h-5 rounded-lg font-black flex items-center justify-center text-[10px] shrink-0 text-white bg-gradient-to-br ${opt.color} shadow-xs`}>
+                                {opt.key}
+                              </span>
+                              <span>{opt.text}</span>
+                            </button>
+                          ))}
+
+                          <button
+                            disabled={!selectedOption}
+                            onClick={() => selectedOption && handleVoteSubmit(selectedOption)}
+                            className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wider uppercase transition-all shadow-lg select-none mt-2 cursor-pointer ${
+                              selectedOption
+                                ? "bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 text-slate-950 hover:brightness-110 shadow-amber-500/20"
+                                : "bg-white/10 text-white/40 border border-white/10 cursor-not-allowed"
+                            }`}
+                          >
+                            अपना वोट दर्ज करें (Cast Vote)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 pt-1 font-sans animate-fade-in">
+                          {[
+                            { key: "A", text: "हाँ, यह विकास का मील का पत्थर है", basePct: 62, barColor: "from-emerald-400 to-teal-500" },
+                            { key: "B", text: "नहीं, किराए और डिब्बों पर ध्यान देना होगा", basePct: 29, barColor: "from-rose-400 to-red-500" },
+                            { key: "C", text: "कह नहीं सकते / अन्य विचार", basePct: 9, barColor: "from-amber-400 to-orange-500" }
+                          ].map((opt) => {
+                            const total = (Object.values(pollVotes) as number[]).reduce((a, b) => a + b, 0);
+                            const votes = (pollVotes[opt.key] as number) || 0;
+                            const pct = Math.round((votes / (total || 1)) * 100);
+                            const isUserChoice = selectedOption === opt.key;
+
+                            return (
+                              <div key={opt.key} className="space-y-1 bg-white/5 p-2 rounded-lg border border-white/10">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className={`font-semibold ${isUserChoice ? "text-amber-300 font-black" : "text-purple-100"}`}>
+                                    {opt.text} {isUserChoice && <span className="text-[10px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black ml-1">आपका जवाब</span>}
+                                  </span>
+                                  <span className="font-extrabold text-amber-300 font-mono">{pct}%</span>
+                                </div>
+                                <div className="w-full bg-slate-950/80 h-2.5 rounded-full overflow-hidden relative border border-white/10">
+                                  <div
+                                    style={{ width: `${pct}%` }}
+                                    className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${opt.barColor}`}
+                                  ></div>
+                                </div>
+                                <div className="text-[9px] text-purple-300 flex justify-between">
+                                  <span>कुल वोट: {votes.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <div className="bg-emerald-500/20 rounded-xl p-2.5 border border-emerald-400/40 flex items-center gap-1.5 text-xs text-emerald-300 font-bold justify-center">
+                            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>वोटिंग के लिए धन्यवाद! सर्वे लाइव है।</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. Sidebar Google AdSense Block Placeholders */}
+                    <div className="border border-dashed border-amber-500/30 rounded-2xl p-4 bg-amber-500/[0.02] text-center select-none space-y-2">
+                      <div className="text-[10px] font-extrabold text-amber-600 tracking-wider">
+                        ⚡ GOOGLE ADSENSE SIDEBAR BANNER (300x250)
+                      </div>
+                      <div className="bg-neutral-50 border border-neutral-150 h-40 rounded flex items-center justify-center text-neutral-400 text-xs font-sans">
+                        विज्ञापन यहाँ प्रसारित होगा
+                      </div>
+                      <p className="text-[9px] text-neutral-400 font-sans leading-relaxed">
+                        Theme is optimized for maximum ad revenue CTR
+                      </p>
+                    </div>
+                  </>
+                )}
 
               </div>
 
