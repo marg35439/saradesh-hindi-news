@@ -20,6 +20,7 @@ export interface Article {
   likes: number;
   comments: Comment[];
   tags: string[];
+  metaDescription?: string;
   isBreaking: boolean;
   isFeatured: boolean;
   isTrending: boolean;

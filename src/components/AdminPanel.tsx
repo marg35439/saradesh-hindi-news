@@ -70,15 +70,15 @@ const extractInlineImages = (text: string) => {
 const parseBatchNewsText = (text: string) => {
   if (!text.trim()) return [];
 
-  // Split text into blocks by looking for number prefixes like 1. or 1: or [1] or खबर 1 or --- or 2+ newlines
+  // Split text into blocks by looking for number prefixes like 1. or 1: or [1] or खबर 1 or --- or decorative lines
   const rawBlocks = text
-    .split(/\n\s*(?:(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]|\[[0-9]+\]|खबर\s*[0-9]+|न्यूज\s*[0-9]+|---|\={3,})\s*/)
+    .split(/\n\s*(?:(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]|\[[0-9]+\]|खबर\s*[0-9]+|न्यूज\s*[0-9]+|News\s*[0-9]+|Article\s*[0-9]+|---|\={3,}|_{3,}|\*{3,})\s*/i)
     .map(b => b.trim())
     .filter(Boolean);
 
   let blocksToProcess = rawBlocks;
   if (blocksToProcess.length <= 1) {
-    // Fallback: split by 2 or more empty lines
+    // Fallback: split by 3 or more newlines
     blocksToProcess = text.split(/\n\s*\n\s*\n/).map(b => b.trim()).filter(Boolean);
   }
   if (blocksToProcess.length <= 1) {
@@ -87,46 +87,116 @@ const parseBatchNewsText = (text: string) => {
   }
 
   return blocksToProcess.map((block, idx) => {
-    const lines = block.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-    
-    let title = lines[0] || `समाचार #${idx + 1}`;
-    // Clean leading numbers or prefixes from title if any
-    title = title.replace(/^(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]\s*/, '').replace(/^(?:शीर्षक|Heading|Title|खबर|न्यूज)[\.\:\)]?\s*/i, '');
+    // Filter out decorative divider lines (e.g., lines made only of dashes, equals, underscores, asterisks)
+    const lines = block
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l.length > 0 && !/^[\-\=\_\*\~\#\s]{3,}$/.test(l));
 
+    let title = "";
     let subtitle = "";
-    let contentStartIdx = 1;
-
-    if (lines.length > 1) {
-      if (
-        lines[1].toLowerCase().startsWith("सबटाइटल") || 
-        lines[1].toLowerCase().startsWith("उप-शीर्षक") || 
-        lines[1].toLowerCase().startsWith("sub") || 
-        (lines[1].length < 120 && lines.length > 2)
-      ) {
-        subtitle = lines[1].replace(/^(?:सबटाइटल|उप-शीर्षक|Subtitle|Sub)[\.\:\)]?\s*/i, '');
-        contentStartIdx = 2;
-      }
-    }
-
-    // Keep ALL remaining text intact as content!
-    const contentLines = lines.slice(contentStartIdx);
-    let content = contentLines.join("\n\n");
-    if (!content) {
-      content = title;
-    }
-
-    // Extract tags if present
+    let content = "";
     let tags: string[] = [];
-    const tagMatch = content.match(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*(.+)$/im);
-    if (tagMatch) {
-      tags = tagMatch[1].split(/[\,\s\#]+/).map(t => t.trim()).filter(Boolean);
-      content = content.replace(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*.+$/im, '').trim();
-    } else {
-      const hashTags = content.match(/#[^\s#]+/g);
-      if (hashTags) {
-        tags = hashTags.map(t => t.replace('#', ''));
+    let metaDescription = "";
+
+    let currentField: 'title' | 'subtitle' | 'content' | 'tags' | 'metaDescription' | null = null;
+    let explicitLabelsFound = false;
+
+    for (const line of lines) {
+      // Key label matchers
+      const titleMatch = line.match(/^(?:title|heading|शीर्षक|हेडिंग|मुख्य\s*शीर्षक)[\.\:\=]\s*(.*)$/i);
+      const subtitleMatch = line.match(/^(?:sub\s*title|subtitle|sub-title|sub\s*heading|subheading|उपशीर्षक|सबटाइटल|सब\s*टाइटल|सब\s*हेडिंग)[\.\:\=]\s*(.*)$/i);
+      const detailMatch = line.match(/^(?:detail\s*news|detail|description|content|विवरण|खबर|समाचार|विस्तार|विस्तृत\s*खबर|मुख्य\s*समाचार)[\.\:\=]\s*(.*)$/i);
+      const tagsMatch = line.match(/^(?:tags|tag|keywords|keyword|टैग्स|टैग|कीवर्ड्स|कीवर्ड)[\.\:\=]\s*(.*)$/i);
+      const metaMatch = line.match(/^(?:meta\s*description|meta|मेटा\s*डिस्क्रिप्शन|मेटा\s*विवरण|मेटा)[\.\:\=]\s*(.*)$/i);
+
+      if (titleMatch) {
+        explicitLabelsFound = true;
+        currentField = 'title';
+        title = titleMatch[1].trim();
+      } else if (subtitleMatch) {
+        explicitLabelsFound = true;
+        currentField = 'subtitle';
+        subtitle = subtitleMatch[1].trim();
+      } else if (detailMatch) {
+        explicitLabelsFound = true;
+        currentField = 'content';
+        const val = detailMatch[1].trim();
+        if (val) content = val;
+      } else if (tagsMatch) {
+        explicitLabelsFound = true;
+        currentField = 'tags';
+        const rawTags = tagsMatch[1].trim();
+        if (rawTags) {
+          tags = rawTags.split(/[\,\s\#]+/).map(t => t.trim()).filter(Boolean);
+        }
+      } else if (metaMatch) {
+        explicitLabelsFound = true;
+        currentField = 'metaDescription';
+        metaDescription = metaMatch[1].trim();
+      } else {
+        if (explicitLabelsFound && currentField) {
+          if (currentField === 'title') {
+            title += (title ? " " : "") + line;
+          } else if (currentField === 'subtitle') {
+            subtitle += (subtitle ? " " : "") + line;
+          } else if (currentField === 'content') {
+            content += (content ? "\n\n" : "") + line;
+          } else if (currentField === 'metaDescription') {
+            metaDescription += (metaDescription ? " " : "") + line;
+          } else if (currentField === 'tags') {
+            const extra = line.split(/[\,\s\#]+/).map(t => t.trim()).filter(Boolean);
+            tags.push(...extra);
+          }
+        }
       }
     }
+
+    // Fallback if no explicit labels were used in the block:
+    if (!explicitLabelsFound) {
+      title = lines[0] || `समाचार #${idx + 1}`;
+      title = title.replace(/^(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]\s*/, '').replace(/^(?:शीर्षक|Heading|Title|खबर|न्यूज)[\.\:\)]?\s*/i, '');
+
+      let contentStartIdx = 1;
+      if (lines.length > 1) {
+        if (
+          lines[1].toLowerCase().startsWith("सबटाइटल") || 
+          lines[1].toLowerCase().startsWith("उप-शीर्षक") || 
+          lines[1].toLowerCase().startsWith("sub") || 
+          (lines[1].length < 120 && lines.length > 2)
+        ) {
+          subtitle = lines[1].replace(/^(?:सबटाइटल|उप-शीर्षक|Subtitle|Sub)[\.\:\)]?\s*/i, '');
+          contentStartIdx = 2;
+        }
+      }
+
+      const contentLines = lines.slice(contentStartIdx);
+      content = contentLines.join("\n\n");
+      if (!content) content = title;
+
+      // Extract tags if present at end
+      const tagMatch = content.match(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*(.+)$/im);
+      if (tagMatch) {
+        tags = tagMatch[1].split(/[\,\s\#]+/).map(t => t.trim()).filter(Boolean);
+        content = content.replace(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*.+$/im, '').trim();
+      } else {
+        const hashTags = content.match(/#[^\s#]+/g);
+        if (hashTags) {
+          tags = hashTags.map(t => t.replace('#', ''));
+        }
+      }
+
+      // Extract meta description if present
+      const metaMatch = content.match(/(?:मेटा\s*विवरण|मेटा\s*डिस्क्रिप्शन|मेटा|Meta\s*description|Meta)\s*[\:\=]\s*(.+)$/im);
+      if (metaMatch) {
+        metaDescription = metaMatch[1].trim();
+        content = content.replace(/(?:मेटा\s*विवरण|मेटा\s*डिस्क्रिप्शन|मेटा|Meta\s*description|Meta)\s*[\:\=]\s*.+$/im, '').trim();
+      }
+    }
+
+    // Clean any remaining decorative separator lines inside content or metaDescription
+    content = content.replace(/^[\-\=\_\*\~\#\s]{3,}$/gm, '').trim();
+    metaDescription = metaDescription.replace(/^[\-\=\_\*\~\#\s]{3,}$/gm, '').trim();
 
     // Auto detect category from text
     let category = "national";
@@ -155,11 +225,12 @@ const parseBatchNewsText = (text: string) => {
       id: `batch-art-${Date.now()}-${idx}`,
       title,
       subtitle,
-      content, // FULL INTACT CONTENT
+      content,
       category,
       state: "",
       author: "सारादेश.in विशेष टीम",
       tags: tags.length > 0 ? tags : ["मुख्य समाचार", "सारादेश"],
+      metaDescription: metaDescription || undefined,
       checked: true,
       assignedImageIndex: idx
     };
@@ -217,6 +288,7 @@ export default function AdminPanel() {
   const [image, setImage] = useState("");
   const [author, setAuthor] = useState("");
   const [tags, setTags] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
   const [isBreaking, setIsBreaking] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [isTrending, setIsTrending] = useState(false);
@@ -660,6 +732,7 @@ export default function AdminPanel() {
             image: art.image,
             author: art.author,
             tags: tagList,
+            metaDescription: art.metaDescription || undefined,
             isBreaking: false,
             isFeatured: false,
             isTrending: true
@@ -766,6 +839,7 @@ export default function AdminPanel() {
       image: image || undefined,
       author,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+      metaDescription: metaDescription.trim() || undefined,
       isBreaking,
       isFeatured,
       isTrending
@@ -790,6 +864,7 @@ export default function AdminPanel() {
     setImage(art.image);
     setAuthor(art.author);
     setTags(art.tags ? art.tags.join(", ") : "");
+    setMetaDescription(art.metaDescription || "");
     setIsBreaking(!!art.isBreaking);
     setIsFeatured(!!art.isFeatured);
     setIsTrending(!!art.isTrending);
@@ -831,6 +906,7 @@ export default function AdminPanel() {
     setImage("");
     setAuthor("");
     setTags("");
+    setMetaDescription("");
     setIsBreaking(false);
     setIsFeatured(false);
     setIsTrending(false);
@@ -1734,6 +1810,23 @@ export default function AdminPanel() {
                   />
                 </div>
 
+                {/* Meta Description (Optional) */}
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">
+                    मेटा विवरण (Meta Description - Optional):
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="सर्च इंजन (SEO) और सोशल शेयरिंग के लिए संक्षिप्त मेटा विवरण दर्ज करें (वैकल्पिक)..."
+                    value={metaDescription}
+                    onChange={(e) => setMetaDescription(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-sans resize-y"
+                  ></textarea>
+                  <p className="text-[10px] text-neutral-400 mt-1 font-sans">
+                    💡 यदि खाली छोड़ा जाता है तो स्वचालित रूप से सब-टाइटल या सामग्री का प्रारंभिक भाग मेटा विवरण के रूप में प्रयोग होगा।
+                  </p>
+                </div>
+
                 {/* Special Ribbon promotions */}
                 <div className="md:col-span-2 grid grid-cols-3 gap-2.5 pt-2">
                   <label className="flex items-center gap-2 border rounded-lg p-2.5 bg-neutral-50/50 hover:bg-neutral-50 cursor-pointer transition-colors">
@@ -2622,6 +2715,19 @@ export default function AdminPanel() {
                             onChange={(e) => handleBatchArticleFieldChange(art.id, "tags", e.target.value)}
                             className="w-full text-xs p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none text-neutral-700 bg-white font-sans"
                           />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                            मेटा विवरण (Meta Description):
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={art.metaDescription || ""}
+                            onChange={(e) => handleBatchArticleFieldChange(art.id, "metaDescription", e.target.value)}
+                            placeholder="सर्च इंजन व सोशल शेयरिंग के लिए मेटा विवरण (वैकल्पिक)..."
+                            className="w-full text-xs p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none text-neutral-700 bg-white font-sans resize-y"
+                          ></textarea>
                         </div>
                       </div>
 

@@ -2485,7 +2485,7 @@ app.post("/api/news/:id/comment", async (req, res) => {
 // POST create manual news (Admin Only - but open in this applet)
 app.post("/api/news", async (req, res) => {
   try {
-    const { title, subtitle, content, category, state, image, author, tags, isBreaking, isFeatured, isTrending } = req.body;
+    const { title, subtitle, content, category, state, image, author, tags, metaDescription, isBreaking, isFeatured, isTrending } = req.body;
     
     if (!title || !content || !category) {
       return res.status(400).json({ error: "शीर्षक, सामग्री और श्रेणी भरना अनिवार्य है।" });
@@ -2510,6 +2510,7 @@ app.post("/api/news", async (req, res) => {
       likes: 0,
       comments: [],
       tags: typeof tags === "string" ? (tags as string).split(",").map(t => t.trim()).filter(Boolean) : (tags || []),
+      metaDescription: metaDescription || null,
       isBreaking: !!isBreaking,
       isFeatured: !!isFeatured,
       isTrending: !!isTrending,
@@ -2560,6 +2561,7 @@ app.put("/api/news/:id", async (req, res) => {
       state: updatedData.state !== undefined ? (updatedData.state || null) : (existingData.state || null),
       image: updatedData.image || existingData.image,
       author: updatedData.author || existingData.author,
+      metaDescription: updatedData.metaDescription !== undefined ? updatedData.metaDescription : existingData.metaDescription,
       isBreaking: updatedData.isBreaking !== undefined ? !!updatedData.isBreaking : existingData.isBreaking,
       isFeatured: updatedData.isFeatured !== undefined ? !!updatedData.isFeatured : existingData.isFeatured,
       isTrending: updatedData.isTrending !== undefined ? !!updatedData.isTrending : existingData.isTrending,
