@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Heart, MessageSquare, Clock, Send, Share2, Eye, Calendar, ThumbsUp, Check, Type, Bookmark, Newspaper, ChevronRight } from "lucide-react";
+import { ArrowLeft, Home, Heart, MessageSquare, Clock, Send, Share2, Eye, Calendar, ThumbsUp, Check, Bookmark, Newspaper, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import { Article, Comment, CATEGORIES } from "../types";
 import { fetchArticleById, likeArticleClient, addCommentClient, fetchNewsList } from "../lib/newsClient";
@@ -31,7 +31,6 @@ export default function ArticleDetail({
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentSuccess, setCommentSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [fontSize, setFontSize] = useState<"normal" | "large" | "xlarge">("xlarge");
   const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
 
   useEffect(() => {
@@ -156,9 +155,7 @@ export default function ArticleDetail({
   }
 
   const getContentFontSizeClass = () => {
-    if (fontSize === "large") return "text-[17px] md:text-[19px]";
-    if (fontSize === "xlarge") return "text-[19px] md:text-[22px]";
-    return "text-[15px] md:text-[17px]";
+    return "text-[17px] md:text-[19px]";
   };
 
   const renderFormattedContent = (rawContent: string, catKey: string) => {
@@ -324,36 +321,31 @@ export default function ArticleDetail({
       transition={{ duration: 0.3 }}
       className="max-w-3xl mx-auto px-4 py-6 md:py-10 pb-20"
     >
-      {/* Back navigation button & Toolbar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <button
-          onClick={onBack}
-          className="group flex items-center gap-1.5 text-neutral-600 hover:text-[#ff6f00] text-sm font-bold cursor-pointer transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 transform group-hover:-translate-x-1 transition-transform" />
-          <span>मुख्य पृष्ठ पर वापस जाएँ</span>
-        </button>
+      {/* Navigation Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-50 p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          {/* 1. Go Back One Page Button */}
+          <button
+            onClick={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                onBack();
+              }
+            }}
+            className="group flex items-center gap-1.5 bg-white hover:bg-neutral-100 text-slate-800 hover:text-slate-950 px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold cursor-pointer transition-all shadow-2xs"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-600 group-hover:-translate-x-0.5 transition-transform" />
+            <span>पीछे जाएँ</span>
+          </button>
 
-        {/* Font Size controls */}
-        <div className="flex items-center gap-1.5 bg-neutral-100 p-1 rounded-lg text-xs font-sans">
-          <Type className="w-3.5 h-3.5 text-neutral-400 ml-1" />
+          {/* 2. Go to Home Page Button */}
           <button
-            onClick={() => setFontSize("normal")}
-            className={`px-2 py-0.5 rounded font-bold ${fontSize === "normal" ? "bg-white text-neutral-900 shadow-2xs" : "text-neutral-500"}`}
+            onClick={onBack}
+            className="group flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold cursor-pointer transition-all shadow-xs hover:shadow-md"
           >
-            अ
-          </button>
-          <button
-            onClick={() => setFontSize("large")}
-            className={`px-2 py-0.5 rounded font-bold ${fontSize === "large" ? "bg-white text-neutral-900 shadow-2xs" : "text-neutral-500"}`}
-          >
-            अ+
-          </button>
-          <button
-            onClick={() => setFontSize("xlarge")}
-            className={`px-2 py-0.5 rounded font-bold ${fontSize === "xlarge" ? "bg-white text-neutral-900 shadow-2xs" : "text-neutral-500"}`}
-          >
-            अ++
+            <Home className="w-4 h-4 text-white" />
+            <span>मुख्य पृष्ठ पर जाएँ</span>
           </button>
         </div>
       </div>

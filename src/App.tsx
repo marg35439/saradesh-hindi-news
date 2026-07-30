@@ -101,6 +101,16 @@ export default function App() {
   // Sidebar weather data
   const [sidebarWeather, setSidebarWeather] = useState<Record<string, { temp: number; text: string; icon: string }>>({});
 
+  // Real-time Stock Market data
+  const [marketData, setMarketData] = useState<{
+    sensex?: { price: number; change: number; changePct: number; isUp: boolean };
+    nifty?: { price: number; change: number; changePct: number; isUp: boolean };
+    banknifty?: { price: number; change: number; changePct: number; isUp: boolean };
+    gold?: { price: number; change: number; changePct: number; isUp: boolean };
+    silver?: { price: number; change: number; changePct: number; isUp: boolean };
+    lastUpdated?: string;
+  } | null>(null);
+
   useEffect(() => {
     const getSidebarWeather = () => {
       fetch("/api/weather")
@@ -112,20 +122,38 @@ export default function App() {
         .catch(() => {
           // Fallback of cities
           setSidebarWeather({
-            "दिल्ली": { temp: 42, text: "भीषण गर्मी (लू)", icon: "Sun" },
-            "मुंबई": { temp: 33, text: "उमस भरा मौसम", icon: "Cloud" },
-            "जयपुर": { temp: 44, text: "सूरज तप रहा है", icon: "Sun" },
-            "भोपाल": { temp: 39, text: "आंशिक रूप से बादल", icon: "CloudSun" },
-            "लखनऊ": { temp: 41, text: "गर्म हवाएं", icon: "Sun" },
-            "पटना": { temp: 40, text: "तेज धूप", icon: "Sun" },
-            "रांची": { temp: 36, text: "मौसम सुहावना", icon: "Cloud" }
+            "दिल्ली": { temp: 32, text: "साफ मौसम", icon: "Sun" },
+            "मुंबई": { temp: 30, text: "उमस भरा मौसम", icon: "Cloud" },
+            "जयपुर": { temp: 33, text: "तेज धूप", icon: "Sun" },
+            "भोपाल": { temp: 29, text: "आंशिक रूप से बादल", icon: "CloudSun" },
+            "लखनऊ": { temp: 31, text: "हल्की धूप", icon: "Sun" },
+            "पटना": { temp: 31, text: "सामान्य मौसम", icon: "CloudSun" },
+            "रांची": { temp: 27, text: "मौसम सुहावना", icon: "Cloud" }
           });
         });
     };
+
+    const getMarketData = () => {
+      fetch("/api/market")
+        .then((res) => {
+          if (res.ok) return res.json();
+          throw new Error();
+        })
+        .then((data) => setMarketData(data))
+        .catch(() => {});
+    };
+
     getSidebarWeather();
-    // Poll every 20 seconds for dynamic weather changes on homepage as requested
-    const interval = setInterval(getSidebarWeather, 20000);
-    return () => clearInterval(interval);
+    getMarketData();
+
+    // Poll every 15 seconds for live real-time market and weather updates
+    const weatherInterval = setInterval(getSidebarWeather, 20000);
+    const marketInterval = setInterval(getMarketData, 15000);
+
+    return () => {
+      clearInterval(weatherInterval);
+      clearInterval(marketInterval);
+    };
   }, []);
 
   const getCityForState = (state: string): string => {
@@ -341,43 +369,68 @@ export default function App() {
             
             {/* Ticker marquee / scrollable items */}
             <div className="overflow-x-auto no-scrollbar flex items-center gap-3 text-xs py-0.5">
+              {/* BSE SENSEX */}
               <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
                 <span className="font-bold text-neutral-300">BSE SENSEX:</span>
-                <span className="font-extrabold text-white font-mono">81,842.30</span>
-                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                  ▲ +412.20 (+0.51%)
+                <span className="font-extrabold text-white font-mono">
+                  {marketData?.sensex ? marketData.sensex.price.toLocaleString('en-IN') : '77,928.15'}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded flex items-center gap-0.5 ${
+                  (marketData?.sensex?.isUp ?? true) ? 'text-emerald-400 bg-emerald-500/20' : 'text-rose-400 bg-rose-500/20'
+                }`}>
+                  {(marketData?.sensex?.isUp ?? true) ? '▲' : '▼'} {marketData?.sensex ? `${marketData.sensex.change > 0 ? '+' : ''}${marketData.sensex.change} (${marketData.sensex.changePct > 0 ? '+' : ''}${marketData.sensex.changePct}%)` : '+273.55 (+0.35%)'}
                 </span>
               </div>
 
+              {/* NSE NIFTY 50 */}
               <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
                 <span className="font-bold text-neutral-300">NSE NIFTY 50:</span>
-                <span className="font-extrabold text-white font-mono">24,960.45</span>
-                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                  ▲ +134.10 (+0.54%)
+                <span className="font-extrabold text-white font-mono">
+                  {marketData?.nifty ? marketData.nifty.price.toLocaleString('en-IN') : '24,317.15'}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded flex items-center gap-0.5 ${
+                  (marketData?.nifty?.isUp ?? true) ? 'text-emerald-400 bg-emerald-500/20' : 'text-rose-400 bg-rose-500/20'
+                }`}>
+                  {(marketData?.nifty?.isUp ?? true) ? '▲' : '▼'} {marketData?.nifty ? `${marketData.nifty.change > 0 ? '+' : ''}${marketData.nifty.change} (${marketData.nifty.changePct > 0 ? '+' : ''}${marketData.nifty.changePct}%)` : '+66.95 (+0.28%)'}
                 </span>
               </div>
 
+              {/* BANK NIFTY */}
               <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
                 <span className="font-bold text-neutral-300">BANK NIFTY:</span>
-                <span className="font-extrabold text-white font-mono">52,280.10</span>
-                <span className="text-[10px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                  ▼ -62.40 (-0.12%)
+                <span className="font-extrabold text-white font-mono">
+                  {marketData?.banknifty ? marketData.banknifty.price.toLocaleString('en-IN') : '57,147.50'}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded flex items-center gap-0.5 ${
+                  (marketData?.banknifty?.isUp ?? false) ? 'text-emerald-400 bg-emerald-500/20' : 'text-rose-400 bg-rose-500/20'
+                }`}>
+                  {(marketData?.banknifty?.isUp ?? false) ? '▲' : '▼'} {marketData?.banknifty ? `${marketData.banknifty.change > 0 ? '+' : ''}${marketData.banknifty.change} (${marketData.banknifty.changePct > 0 ? '+' : ''}${marketData.banknifty.changePct}%)` : '-58.40 (-0.10%)'}
                 </span>
               </div>
 
+              {/* GOLD */}
               <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
                 <span className="font-bold text-amber-300">GOLD (24K/10g):</span>
-                <span className="font-extrabold text-white font-mono">₹74,850</span>
-                <span className="text-[10px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.2 rounded">
-                  ▼ -120
+                <span className="font-extrabold text-white font-mono">
+                  ₹{marketData?.gold ? marketData.gold.price.toLocaleString('en-IN') : '74,850'}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
+                  (marketData?.gold?.isUp ?? true) ? 'text-emerald-400 bg-emerald-500/20' : 'text-rose-400 bg-rose-500/20'
+                }`}>
+                  {(marketData?.gold?.isUp ?? true) ? '▲' : '▼'} {marketData?.gold ? `${marketData.gold.change > 0 ? '+' : ''}${marketData.gold.change}` : '+250'}
                 </span>
               </div>
 
+              {/* SILVER */}
               <div className="flex items-center gap-1.5 shrink-0 bg-white/10 hover:bg-white/15 px-2.5 py-1 rounded-lg border border-white/10 transition-colors">
                 <span className="font-bold text-neutral-300">SILVER (1kg):</span>
-                <span className="font-extrabold text-white font-mono">₹89,200</span>
-                <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded">
-                  ▲ +450
+                <span className="font-extrabold text-white font-mono">
+                  ₹{marketData?.silver ? marketData.silver.price.toLocaleString('en-IN') : '89,200'}
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
+                  (marketData?.silver?.isUp ?? true) ? 'text-emerald-400 bg-emerald-500/20' : 'text-rose-400 bg-rose-500/20'
+                }`}>
+                  {(marketData?.silver?.isUp ?? true) ? '▲' : '▼'} {marketData?.silver ? `${marketData.silver.change > 0 ? '+' : ''}${marketData.silver.change}` : '+450'}
                 </span>
               </div>
             </div>
@@ -687,7 +740,9 @@ export default function App() {
                             <h3 className="text-xs sm:text-sm font-black uppercase text-emerald-400 tracking-wider font-sans">
                               📈 शेयर बाज़ार लाइव अपडेट (MARKET)
                             </h3>
-                            <p className="text-[10px] text-neutral-400 font-sans">बीएससी सेंसेक्स एवं एनएसई निफ्टी 50</p>
+                            <p className="text-[10px] text-neutral-400 font-sans">
+                              बीएससी सेंसेक्स एवं एनएसई निफ्टी 50 • अपडेट: {marketData?.lastUpdated || "LIVE"}
+                            </p>
                           </div>
                         </div>
                         <span className="text-[9px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full font-sans uppercase animate-pulse tracking-wider">
@@ -700,40 +755,56 @@ export default function App() {
                         {/* Sensex */}
                         <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
                           <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">BSE SENSEX</div>
-                          <div className="text-sm font-black text-white font-mono mt-0.5">81,842.30</div>
-                          <div className="text-[10px] font-black text-emerald-400 flex items-center gap-0.5 mt-0.5">
-                            <TrendingUp className="w-3 h-3" />
-                            <span>+412.20 (+0.51%)</span>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">
+                            {marketData?.sensex ? marketData.sensex.price.toLocaleString('en-IN') : '77,928.15'}
+                          </div>
+                          <div className={`text-[10px] font-black flex items-center gap-0.5 mt-0.5 ${
+                            (marketData?.sensex?.isUp ?? true) ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {(marketData?.sensex?.isUp ?? true) ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span>{marketData?.sensex ? `${marketData.sensex.change > 0 ? '+' : ''}${marketData.sensex.change} (${marketData.sensex.changePct > 0 ? '+' : ''}${marketData.sensex.changePct}%)` : '+273.55 (+0.35%)'}</span>
                           </div>
                         </div>
 
                         {/* Nifty 50 */}
                         <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
                           <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">NSE NIFTY 50</div>
-                          <div className="text-sm font-black text-white font-mono mt-0.5">24,960.45</div>
-                          <div className="text-[10px] font-black text-emerald-400 flex items-center gap-0.5 mt-0.5">
-                            <TrendingUp className="w-3 h-3" />
-                            <span>+134.10 (+0.54%)</span>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">
+                            {marketData?.nifty ? marketData.nifty.price.toLocaleString('en-IN') : '24,317.15'}
+                          </div>
+                          <div className={`text-[10px] font-black flex items-center gap-0.5 mt-0.5 ${
+                            (marketData?.nifty?.isUp ?? true) ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {(marketData?.nifty?.isUp ?? true) ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span>{marketData?.nifty ? `${marketData.nifty.change > 0 ? '+' : ''}${marketData.nifty.change} (${marketData.nifty.changePct > 0 ? '+' : ''}${marketData.nifty.changePct}%)` : '+66.95 (+0.28%)'}</span>
                           </div>
                         </div>
 
                         {/* Bank Nifty */}
                         <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
                           <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">NIFTY BANK</div>
-                          <div className="text-sm font-black text-white font-mono mt-0.5">52,280.10</div>
-                          <div className="text-[10px] font-black text-rose-400 flex items-center gap-0.5 mt-0.5">
-                            <TrendingDown className="w-3 h-3" />
-                            <span>-62.40 (-0.12%)</span>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">
+                            {marketData?.banknifty ? marketData.banknifty.price.toLocaleString('en-IN') : '57,147.50'}
+                          </div>
+                          <div className={`text-[10px] font-black flex items-center gap-0.5 mt-0.5 ${
+                            (marketData?.banknifty?.isUp ?? false) ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {(marketData?.banknifty?.isUp ?? false) ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span>{marketData?.banknifty ? `${marketData.banknifty.change > 0 ? '+' : ''}${marketData.banknifty.change} (${marketData.banknifty.changePct > 0 ? '+' : ''}${marketData.banknifty.changePct}%)` : '-58.40 (-0.10%)'}</span>
                           </div>
                         </div>
 
                         {/* Gold */}
                         <div className="bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 transition-colors">
                           <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wide">सोना 24K (10g)</div>
-                          <div className="text-sm font-black text-white font-mono mt-0.5">₹74,850</div>
-                          <div className="text-[10px] font-black text-rose-400 flex items-center gap-0.5 mt-0.5">
-                            <TrendingDown className="w-3 h-3" />
-                            <span>-120 (-0.16%)</span>
+                          <div className="text-sm font-black text-white font-mono mt-0.5">
+                            ₹{marketData?.gold ? marketData.gold.price.toLocaleString('en-IN') : '74,850'}
+                          </div>
+                          <div className={`text-[10px] font-black flex items-center gap-0.5 mt-0.5 ${
+                            (marketData?.gold?.isUp ?? true) ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {(marketData?.gold?.isUp ?? true) ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span>{marketData?.gold ? `${marketData.gold.change > 0 ? '+' : ''}${marketData.gold.change} (${marketData.gold.changePct > 0 ? '+' : ''}${marketData.gold.changePct}%)` : '+250 (+0.33%)'}</span>
                           </div>
                         </div>
                       </div>

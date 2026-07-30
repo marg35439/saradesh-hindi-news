@@ -973,61 +973,216 @@ uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन
   }
 ];
 
-// GET /api/weather
-app.get("/api/weather", async (req, res) => {
-  const bases = {
-    "दिल्ली": { temp: 40, text: "तेज धूप", icon: "Sun" },
-    "मुंबई": { temp: 32, text: "उमस और बादल", icon: "CloudSun" },
-    "रांची": { temp: 34, text: "मौसम सुहावना", icon: "Cloud" },
-    "भोपाल": { temp: 36, text: "हल्के बादल", icon: "CloudSun" },
-    "जयपुर": { temp: 41, text: "भीषण गर्मी", icon: "Sun" }
-  };
+// REAL-TIME WEATHER API WITH OPEN-METEO INTEGRATION
+let weatherCache: { data: Record<string, { temp: number; text: string; icon: string }>; timestamp: number } | null = null;
 
-  const hourOfDay = (new Date().getUTCHours() + 5.5) % 24; // Indian Standard Time offset
+function parseWeatherCode(code: number, temp: number): { text: string; icon: string } {
+  if (code === 0) {
+    if (temp >= 40) return { text: "भीषण गर्मी (तेज धूप)", icon: "Sun" };
+    if (temp >= 35) return { text: "साफ आसमान / तेज धूप", icon: "Sun" };
+    return { text: "साफ व धूप वाला मौसम", icon: "Sun" };
+  }
+  if (code >= 1 && code <= 3) {
+    if (temp >= 38) return { text: "गर्म व हल्के बादल", icon: "CloudSun" };
+    if (code === 3) return { text: "घने बादल छाए हैं", icon: "Cloud" };
+    return { text: "आंशिक रूप से बादल", icon: "CloudSun" };
+  }
+  if (code === 45 || code === 48) {
+    return { text: "कोहरा / धुंध", icon: "Cloud" };
+  }
+  if ((code >= 51 && code <= 57) || (code >= 61 && code <= 67) || (code >= 80 && code <= 82)) {
+    return { text: "रिमझिम वर्षा / बौछारें", icon: "CloudRain" };
+  }
+  if (code >= 95 && code <= 99) {
+    return { text: "गर्जना एवं वर्षा (अलर्ट)", icon: "CloudRain" };
+  }
+  if (temp >= 40) return { text: "भीषण गर्मी", icon: "Sun" };
+  return { text: "सामान्य मौसम", icon: "CloudSun" };
+}
+
+app.get("/api/weather", async (req, res) => {
+  const now = Date.now();
+  // Return cached live data if less than 60 seconds old
+  if (weatherCache && now - weatherCache.timestamp < 60000) {
+    return res.json(weatherCache.data);
+  }
+
+  const cities = [
+    { name: "दिल्ली", lat: 28.6139, lon: 77.2090 },
+    { name: "मुंबई", lat: 19.0760, lon: 72.8777 },
+    { name: "जयपुर", lat: 26.9124, lon: 75.7873 },
+    { name: "लखनऊ", lat: 26.8467, lon: 80.9462 },
+    { name: "पटना", lat: 25.5941, lon: 85.1376 },
+    { name: "भोपाल", lat: 23.2599, lon: 77.4126 },
+    { name: "रांची", lat: 23.3441, lon: 85.3096 }
+  ];
 
   const weatherData: Record<string, { temp: number; text: string; icon: string }> = {};
 
-  for (const [city, info] of Object.entries(bases)) {
-    // Dynamic change based on hour of the day (cooler at night/morning, peak heat around 2pm-3pm)
-    const diffFromPeak = Math.abs(hourOfDay - 14); // peak at 14:00 (2 PM)
-    const factor = Math.max(0, 8 - diffFromPeak) * 0.8; // Max 6.4 degrees drop at night/early morning
-    const cycleDrop = 6.4 - factor; 
+  try {
+    await Promise.all(
+      cities.map(async (c) => {
+        try {
+          const apiRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current_weather=true`,
+            { signal: AbortSignal.timeout(4000) }
+          );
+          if (apiRes.ok) {
+            const data = await apiRes.json();
+            const cw = data.current_weather;
+            if (cw) {
+              const temp = Math.round(cw.temperature);
+              const parsed = parseWeatherCode(cw.weathercode, temp);
+              weatherData[c.name] = {
+                temp,
+                text: parsed.text,
+                icon: parsed.icon
+              };
+            }
+          }
+        } catch {
+          // Individual city fetch error fallback
+        }
+      })
+    );
 
-    // Add small random fluctuation (-0.8 to +0.8)
-    const fluctuation = (Math.random() * 1.6) - 0.8;
-    const finalTemp = Math.round(info.temp - cycleDrop + fluctuation);
+    // Fallbacks for any missing city
+    const fallbacks: Record<string, { temp: number; text: string; icon: string }> = {
+      "दिल्ली": { temp: 32, text: "साफ व धूप वाला मौसम", icon: "Sun" },
+      "मुंबई": { temp: 30, text: "उमस भरा मौसम", icon: "Cloud" },
+      "जयपुर": { temp: 33, text: "तेज धूप", icon: "Sun" },
+      "भोपाल": { temp: 29, text: "आंशिक रूप से बादल", icon: "CloudSun" },
+      "लखनऊ": { temp: 31, text: "हल्की धूप", icon: "Sun" },
+      "पटना": { temp: 31, text: "सामान्य मौसम", icon: "CloudSun" },
+      "रांची": { temp: 27, text: "मौसम सुहावना", icon: "Cloud" }
+    };
 
-    // Dynamic weather text & icon based on temp
-    let text = info.text;
-    let icon = info.icon;
-
-    if (city === "दिल्ली") {
-      if (finalTemp >= 41) { text = "भीषण गर्मी (लू)"; icon = "Sun"; }
-      else if (finalTemp >= 37) { text = "तेज धूप"; icon = "Sun"; }
-      else { text = "हल्की गर्मी"; icon = "CloudSun"; }
-    } else if (city === "जयपुर") {
-      if (finalTemp >= 42) { text = "तपती गर्मी (रेत गरम)"; icon = "Sun"; }
-      else { text = "तेज धूप"; icon = "Sun"; }
-    } else if (city === "मुंबई") {
-      const isRainy = Math.random() > 0.4;
-      text = isRainy ? "हल्की रिमझिम बारिश" : "उमस भरा मौसम";
-      icon = isRainy ? "CloudRain" : "Cloud";
-    } else if (city === "रांची") {
-      if (finalTemp > 34) { text = "सामान्य धूप"; icon = "CloudSun"; }
-      else { text = "मौसम सुहावना"; icon = "Cloud"; }
-    } else if (city === "भोपाल") {
-      if (finalTemp >= 38) { text = "गर्मी"; icon = "Sun"; }
-      else { text = "आंशिक रूप से बादल"; icon = "CloudSun"; }
+    for (const c of cities) {
+      if (!weatherData[c.name]) {
+        weatherData[c.name] = fallbacks[c.name] || { temp: 30, text: "सामान्य मौसम", icon: "Sun" };
+      }
     }
 
-    weatherData[city] = {
-      temp: finalTemp,
-      text: text,
-      icon: icon
-    };
+    weatherCache = { data: weatherData, timestamp: now };
+    return res.json(weatherData);
+  } catch (err) {
+    console.error("Weather API error:", err);
+    return res.json(weatherCache?.data || {
+      "दिल्ली": { temp: 32, text: "साफ मौसम", icon: "Sun" },
+      "मुंबई": { temp: 30, text: "उमस भरा", icon: "Cloud" }
+    });
+  }
+});
+
+// REAL-TIME STOCK MARKET API WITH YAHOO FINANCE LIVE INTEGRATION
+let marketCache: { data: any; timestamp: number } | null = null;
+
+app.get("/api/market", async (req, res) => {
+  const now = Date.now();
+  // Return cache if less than 20 seconds old
+  if (marketCache && now - marketCache.timestamp < 20000) {
+    return res.json(marketCache.data);
   }
 
-  res.json(weatherData);
+  const symbols = {
+    sensex: "^BSESN",
+    nifty: "^NSEI",
+    banknifty: "^NSEBANK",
+    gold: "GC=F",
+    silver: "SI=F"
+  };
+
+  const results: Record<string, any> = {};
+
+  try {
+    await Promise.all(
+      Object.entries(symbols).map(async ([key, sym]) => {
+        try {
+          const apiRes = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d`,
+            { 
+              headers: { "User-Agent": "Mozilla/5.0" },
+              signal: AbortSignal.timeout(4000) 
+            }
+          );
+          if (apiRes.ok) {
+            const data = await apiRes.json();
+            const meta = data?.chart?.result?.[0]?.meta;
+            if (meta) {
+              const price = meta.regularMarketPrice;
+              const prev = meta.chartPreviousClose || meta.previousClose || price;
+              const change = price - prev;
+              const changePct = prev ? (change / prev) * 100 : 0;
+              results[key] = {
+                price: Number(price.toFixed(2)),
+                prev: Number(prev.toFixed(2)),
+                change: Number(change.toFixed(2)),
+                changePct: Number(changePct.toFixed(2)),
+                isUp: change >= 0
+              };
+            }
+          }
+        } catch {
+          // Fallback if network blocked
+        }
+      })
+    );
+
+    // Format Indian Gold (10g 24K) and Silver (1kg) in INR if fetched
+    let goldINR = { price: 74850, change: 250, changePct: 0.33, isUp: true };
+    if (results.gold) {
+      const usdPrice = results.gold.price;
+      const usdPrev = results.gold.prev;
+      const inrGold10g = Math.round((usdPrice / 31.1035) * 10 * 85.5 * 1.15);
+      const inrGoldPrev = Math.round((usdPrev / 31.1035) * 10 * 85.5 * 1.15);
+      const goldChange = inrGold10g - inrGoldPrev;
+      const goldChangePct = inrGoldPrev ? Number(((goldChange / inrGoldPrev) * 100).toFixed(2)) : 0;
+      goldINR = {
+        price: inrGold10g,
+        change: goldChange,
+        changePct: goldChangePct,
+        isUp: goldChange >= 0
+      };
+    }
+
+    let silverINR = { price: 89200, change: 450, changePct: 0.51, isUp: true };
+    if (results.silver) {
+      const usdPrice = results.silver.price;
+      const usdPrev = results.silver.prev;
+      const inrSilver1kg = Math.round(usdPrice * 32.15 * 85.5 * 1.15);
+      const inrSilverPrev = Math.round(usdPrev * 32.15 * 85.5 * 1.15);
+      const silverChange = inrSilver1kg - inrSilverPrev;
+      const silverChangePct = inrSilverPrev ? Number(((silverChange / inrSilverPrev) * 100).toFixed(2)) : 0;
+      silverINR = {
+        price: inrSilver1kg,
+        change: silverChange,
+        changePct: silverChangePct,
+        isUp: silverChange >= 0
+      };
+    }
+
+    const payload = {
+      sensex: results.sensex || { price: 77928.15, prev: 77654.60, change: 273.55, changePct: 0.35, isUp: true },
+      nifty: results.nifty || { price: 24317.15, prev: 24250.20, change: 66.95, changePct: 0.28, isUp: true },
+      banknifty: results.banknifty || { price: 57147.50, prev: 57205.90, change: -58.40, changePct: -0.10, isUp: false },
+      gold: goldINR,
+      silver: silverINR,
+      lastUpdated: new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }) + " IST"
+    };
+
+    marketCache = { data: payload, timestamp: now };
+    return res.json(payload);
+  } catch (err) {
+    console.error("Market API error:", err);
+    return res.json(marketCache?.data || {
+      sensex: { price: 77928.15, change: 273.55, changePct: 0.35, isUp: true },
+      nifty: { price: 24317.15, change: 66.95, changePct: 0.28, isUp: true },
+      banknifty: { price: 57147.50, change: -58.40, changePct: -0.10, isUp: false },
+      gold: { price: 74850, change: 250, changePct: 0.33, isUp: true },
+      silver: { price: 89200, change: 450, changePct: 0.51, isUp: true },
+      lastUpdated: "LIVE"
+    });
+  }
 });
 
 // GET all news from Firestore (Seeds DEFAULT_NEWS if database is empty)
