@@ -6,7 +6,8 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
-import { Article } from "./src/types.js"; // Note: ESM requires suffix or simple resolution, we can define inline types or import directly without extension since we are in tsx
+import { Article } from "./src/types.js";
+import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
 
 // Firebase Imports
 import { initializeApp } from "firebase/app";
@@ -125,7 +126,8 @@ function getGeminiClient(): GoogleGenAI {
 }
 
 // Initial robust Dainik Bhaskar style Hindi articles with complete rich content
-const DEFAULT_NEWS: any[] = [
+const DEFAULT_NEWS: any[] = FALLBACK_NEWS;
+const _OLD_DEFAULT_NEWS: any[] = [
   {
     id: "news-1",
     title: "चंद्रयान-4 मिशन के लिए इसरो की बड़ी घोषणा: चांद से मिट्टी वापस लाने की तैयारी शुरू",
@@ -1045,54 +1047,26 @@ app.get("/api/news", async (req, res) => {
       return dateB - dateA;
     });
 
-    // Seed if empty or enrich items if existing items have incomplete text
-    if (articles.length === 0) {
-      console.log("Firestore articles collection is empty. Seeding DEFAULT_NEWS...");
-      for (const item of DEFAULT_NEWS) {
-        const docRef = doc(db, "articles", item.id);
-        const seededItem = {
-          ...item,
-          createdAt: item.createdAt || new Date().toISOString()
-        };
-        await setDoc(docRef, seededItem);
-        articles.push(seededItem);
+    // Force sync and update canonical articles in Firestore with clean, verified news
+    const canonicalIds = new Set(DEFAULT_NEWS.map(item => item.id));
+
+    // Delete outdated news articles from Firestore
+    for (const docSnap of querySnapshot.docs) {
+      if (!canonicalIds.has(docSnap.id) && docSnap.id.startsWith("news-")) {
+        await deleteDoc(doc(db, "articles", docSnap.id)).catch(() => {});
       }
-      articles.sort((a, b) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return dateB - dateA;
-      });
-    } else {
-      // Ensure all default articles have strictly correct categories and updated content
-      for (const defItem of DEFAULT_NEWS) {
-        const existingDoc = articles.find(a => a.id === defItem.id);
-        if (!existingDoc) {
-          // If a new default article was added to DEFAULT_NEWS, add it to Firestore
-          const docRef = doc(db, "articles", defItem.id);
-          const newItem = { ...defItem, createdAt: new Date().toISOString() };
-          await setDoc(docRef, newItem).catch(() => {});
-          articles.push(newItem);
-        } else {
-          // Always ensure category and core fields match the canonical DEFAULT_NEWS specification
-          if (existingDoc.category !== defItem.category || !existingDoc.content || existingDoc.content.length < 300) {
-            const docRef = doc(db, "articles", defItem.id);
-            const updatedData = {
-              ...existingDoc,
-              title: defItem.title,
-              subtitle: defItem.subtitle,
-              content: defItem.content,
-              category: defItem.category,
-              state: defItem.state || existingDoc.state || "",
-              image: defItem.image,
-              author: defItem.author,
-              tags: defItem.tags,
-              readTime: defItem.readTime
-            };
-            await setDoc(docRef, updatedData, { merge: true }).catch(() => {});
-            Object.assign(existingDoc, updatedData);
-          }
-        }
-      }
+    }
+
+    // Force update canonical items in Firestore
+    articles = [];
+    for (const defItem of DEFAULT_NEWS) {
+      const docRef = doc(db, "articles", defItem.id);
+      const updatedItem = {
+        ...defItem,
+        createdAt: defItem.createdAt || new Date().toISOString()
+      };
+      await setDoc(docRef, updatedItem, { merge: true }).catch(() => {});
+      articles.push(updatedItem);
     }
 
     // Filter by category if query exists
