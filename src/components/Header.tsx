@@ -171,11 +171,11 @@ export default function Header({ onAdminClick, isAdminMode, onHomeClick }: Heade
 
 // Fallback constant for compiler safety & startup
 const WEATHER_DATA_FALLBACK: Record<string, { temp: number; text: string; icon: string }> = {
-  "दिल्ली": { temp: 42, text: "भीषण गर्मी (लू)", icon: "Sun" },
-  "मुंबई": { temp: 32, text: "हल्की बारिश", icon: "CloudRain" },
-  "जयपुर": { temp: 44, text: "सूरज तप रहा है", icon: "Sun" },
-  "भोपाल": { temp: 39, text: "आंशिक रूप से बादल", icon: "CloudSun" },
-  "लखनऊ": { temp: 41, text: "गर्म हवाएं", icon: "Sun" },
-  "पटना": { temp: 40, text: "तेज धूप", icon: "Sun" },
-  "रांची": { temp: 36, text: "मौसम सुहावना", icon: "Cloud" }
+  "दिल्ली": { temp: 32, text: "साफ व धूप वाला मौसम", icon: "Sun" },
+  "मुंबई": { temp: 30, text: "उमस भरा मौसम", icon: "Cloud" },
+  "जयपुर": { temp: 33, text: "तेज धूप", icon: "Sun" },
+  "भोपाल": { temp: 29, text: "आंशिक रूप से बादल", icon: "CloudSun" },
+  "लखनऊ": { temp: 31, text: "हल्की धूप", icon: "Sun" },
+  "पटना": { temp: 31, text: "सामान्य मौसम", icon: "CloudSun" },
+  "रांची": { temp: 27, text: "मौसम सुहावना", icon: "Cloud" }
 };

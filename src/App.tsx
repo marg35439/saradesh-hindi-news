@@ -844,13 +844,13 @@ export default function App() {
                                   return { city, temp: w.temp, text: w.text, icon: w.icon };
                                 })
                               : [
-                                  { city: "दिल्ली", temp: 42, text: "भीषण गर्मी (लू)", icon: "Sun" },
-                                  { city: "मुंबई", temp: 33, text: "उमस भरा", icon: "Cloud" },
-                                  { city: "जयपुर", temp: 44, text: "सूरज तप रहा", icon: "Sun" },
-                                  { city: "लखनऊ", temp: 41, text: "गर्म हवाएं", icon: "Sun" },
-                                  { city: "पटना", temp: 40, text: "तेज धूप", icon: "Sun" },
-                                  { city: "भोपाल", temp: 39, text: "बादल छाए", icon: "CloudSun" },
-                                  { city: "रांची", temp: 36, text: "सुहावना", icon: "Cloud" }
+                                  { city: "दिल्ली", temp: 32, text: "साफ मौसम", icon: "Sun" },
+                                  { city: "मुंबई", temp: 30, text: "उमस भरा", icon: "Cloud" },
+                                  { city: "जयपुर", temp: 33, text: "तेज धूप", icon: "Sun" },
+                                  { city: "लखनऊ", temp: 31, text: "हल्की धूप", icon: "Sun" },
+                                  { city: "पटना", temp: 31, text: "सामान्य मौसम", icon: "CloudSun" },
+                                  { city: "भोपाल", temp: 29, text: "बादल छाए", icon: "CloudSun" },
+                                  { city: "रांची", temp: 27, text: "सुहावना", icon: "Cloud" }
                                 ];
                             
                             // Repeat list for seamless ticker loop
