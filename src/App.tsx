@@ -161,7 +161,29 @@ export default function App() {
       setSelectedState(initialState);
     }
 
-    // 2. Keyboard shortcut: Alt + Shift + A to toggle admin mode secretly
+    // 2. Popstate listener for browser back/forward buttons
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const articleId = p.get("article") || p.get("id");
+      setSelectedArticleId(articleId || null);
+
+      const cat = p.get("category");
+      if (cat) {
+        setSelectedCategory(cat as CategoryKey);
+      }
+
+      const st = p.get("state");
+      if (st) {
+        setSelectedState(st);
+      }
+
+      setIsAdminMode(p.get("admin") === "true");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    // 3. Keyboard shortcut: Alt + Shift + A to toggle admin mode secretly
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && e.shiftKey && (e.key === "A" || e.key === "a")) {
         e.preventDefault();
@@ -171,6 +193,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
+      window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
@@ -335,9 +358,21 @@ export default function App() {
             >
               <ArticleDetail 
                 articleId={selectedArticleId} 
-                onBack={() => setSelectedArticleId(null)}
+                onBack={() => {
+                  if (window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    setSelectedArticleId(null);
+                    try {
+                      window.history.pushState({}, "", window.location.pathname);
+                    } catch {}
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
                 isBookmarked={savedArticleIds.includes(selectedArticleId)}
                 onToggleBookmark={(e, art) => toggleBookmark(e, art)}
+                allArticles={articles}
+                onArticleSelect={(art) => handleArticleClick(art)}
               />
             </motion.div>
           )
@@ -660,136 +695,35 @@ export default function App() {
                   </div>
 
                   <div className="p-3 space-y-2.5">
-                    {[
-                      {
-                        id: "news-job-1",
-                        tag: "SSC CGL 2026",
-                        title: "SSC CGL 2026: 15,000+ पदों पर बंपर भर्ती जारी, नोटिफिकेशन व ऑनलाइन फॉर्म जमा करें",
-                        date: "28 जुलाई",
-                        color: "bg-blue-600 text-white",
-                        titleColor: "text-blue-900 hover:text-blue-700",
-                        detail: `कर्मचारी चयन आयोग (SSC) ने देश भर के विभिन्न केंद्रीय मंत्रालयों, विभागों और संगठनों में ग्रुप B और C के पदों पर 15,000 से अधिक रिक्तियों के लिए नोटिफिकेशन जारी कर दिया है। सरकारी नौकरी की तैयारी कर रहे लाखों अभ्यर्थियों के लिए यह वर्ष की सबसे बड़ी भर्ती है।
-
-## शैक्षणिक योग्यता एवं आयु सीमा:
-- **शैक्षणिक योग्यता:** मान्यता प्राप्त विश्वविद्यालय से किसी भी विषय में स्नातक (Bachelor's Degree) होना अनिवार्य है।
-- **आयु सीमा:** न्यूनतम 18 वर्ष से अधिकतम 30 वर्ष (आरक्षित श्रेणियों को नियमानुसार छूट)।
-
-### चयन प्रक्रिया के 3 मुख्य चरण:
-1. **टियर-1 परीक्षा:** कंप्यूटर आधारित (CBT) वस्तुनिष्ठ परीक्षा (स्क्रीनिंग टेस्ट)।
-2. **टियर-2 परीक्षा:** गणित, रीजनिंग, अंग्रेजी और सामान्य जागरूकता का गहन परीक्षण।
-3. **दस्तावेज़ सत्यापन एवं मेडिकल:** अंतिम चयन सूची टियर-2 के प्राप्तांकों के आधार पर तैयार होगी।
-
-## आवेदन कैसे करें?
-1. आधिकारिक वेबसाइट ssc.gov.in पर जाएं।
-2. "New Registration" विकल्प पर क्लिक करके वन-टाइम रजिस्ट्रेशन (OTR) पूरा करें।
-3. SSC CGL 2026 आवेदन लिंक पर जाकर अपनी शैक्षणिक जानकारी व फोटो-हस्ताक्षर अपलोड करें।
-4. आवेदन शुल्क ₹100 जमा करें (महिला / SC / ST के लिए नि:शुल्क)।
-
-### महत्वपूर्ण तिथियां:
-- **आवेदन प्रारंभ:** 28 जुलाई 2026
-- **अंतिम तिथि:** 30 अगस्त 2026
-- **टियर-1 परीक्षा संभावित माह:** अक्टूबर/नवंबर 2026`
-                      },
-                      {
-                        id: "news-job-2",
-                        tag: "रेलवे NTPC",
-                        title: "रेलवे RRB 2026: आरपीएफ एवं स्टेशन मास्टर के 22,000 पदों पर नई भर्ती प्रक्रिया शुरू",
-                        date: "27 जुलाई",
-                        color: "bg-cyan-600 text-white",
-                        titleColor: "text-indigo-900 hover:text-indigo-700",
-                        detail: `रेलवे भर्ती बोर्ड (RRB) ने भारतीय रेलवे के विभिन्न जोनों में गैर-तकनीकी लोकप्रिय श्रेणियों (NTPC), स्टेशन मास्टर, गार्ड एवं RPF आरक्षकों के लिए 22,000 पदों की भर्ती हेतु ऑनलाइन आवेदन आमंत्रित किए हैं।
-
-## मुख्य पात्रता एवं मानदंड:
-- **शैक्षणिक योग्यता:** 12वीं पास / स्नातक (विभिन्न पदों के अनुसार अलग-अलग)।
-- **आयु सीमा:** 18 से 33 वर्ष (ओबीसी को 3 वर्ष तथा एससी/एसटी को 5 वर्ष की छूट)।
-
-### परीक्षा पैटर्न व विषय:
-- **प्रथम चरण (CBT-1):** गणित (30 अंक), सामान्य बुद्धिमत्ता व तर्कशास्त्र (30 अंक), सामान्य ज्ञान (40 अंक)।
-- **द्वितीय चरण (CBT-2):** कुल 120 प्रश्न, समय 90 मिनट।
-- **शारीरिक दक्षता परीक्षण (RPF हेतु):** दौड़ एवं लंबी कूद।
-
-## महत्वपूर्ण दिशा-निर्देश:
-अभ्यर्थी केवल एक ही रेलवे ज़ोन से आवेदन कर सकते हैं। अधिकारिक नोटिफिकेशन देखने एवं फॉर्म भरने के लिए rrbcdg.gov.in पर लॉगिन करें।`
-                      },
-                      {
-                        id: "news-job-3",
-                        tag: "यूपी पुलिस",
-                        title: "यूपी पुलिस कांस्टेबल एवं SI भर्ती 2026: परीक्षा तिथियां घोषित, एडमिट कार्ड डाउनलोड करें",
-                        date: "26 जुलाई",
-                        color: "bg-indigo-600 text-white",
-                        titleColor: "text-blue-900 hover:text-blue-700",
-                        detail: `उत्तर प्रदेश पुलिस भर्ती एवं प्रोन्नति बोर्ड (UPPRPB) ने कांस्टेबल और सब-इंस्पेक्टर भर्ती परीक्षा 2026 की तिथियों का आधिकारिक ऐलान कर दिया है।
-
-## परीक्षा कार्यक्रम एवं केंद्र:
-- **परीक्षा तिथियां:** 15 और 16 अगस्त 2026 (दो पालियों में)।
-- **परीक्षा केंद्र:** प्रदेश के सभी 75 जिलों में कुल 1,200 परीक्षा केंद्र बनाए गए हैं।
-
-### परीक्षा हॉल हेतु महत्वपूर्ण नियम:
-1. ई-एडमिट कार्ड और मूल फोटो पहचान पत्र (आधार कार्ड/ड्राइविंग लाइसेंस) अनिवार्य है।
-2. बायोमेट्रिक और फेस रिकग्निशन सत्यापन के बाद ही केंद्र में प्रवेश मिलेगा।
-3. नकारात्मक अंकन (Negative Marking): प्रत्येक गलत उत्तर पर 0.50 अंक काटे जाएंगे।
-
-## प्रवेश पत्र कैसे डाउनलोड करें?
-uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन नंबर और जन्म तिथि डालकर एडमिट कार्ड तुरंत प्रिंट कर लें।`
-                      },
-                      {
-                        id: "news-job-4",
-                        tag: "शिक्षक भर्ती",
-                        title: "CTET 2026 & राज्य प्राथमिक शिक्षक भर्ती: 40,000 पदों पर काउंसलिंग शेड्यूल जारी",
-                        date: "25 जुलाई",
-                        color: "bg-teal-600 text-white",
-                        titleColor: "text-teal-900 hover:text-teal-700",
-                        detail: `केंद्रीय माध्यमिक शिक्षा बोर्ड (CBSE) तथा राज्य शिक्षा विभागों द्वारा संयुक्त रूप से आयोजित शिक्षक पात्रता परीक्षा (CTET) उत्तीर्ण अभ्यर्थियों के लिए 40,000 प्राथमिक व उच्च प्राथमिक शिक्षक पदों पर ऑनलाइन काउंसलिंग प्रक्रिया शुरू हो गई है।
-
-## आवश्यक अर्हता एवं दस्तावेज:
-- **शैक्षणिक अर्हता:** B.Ed / D.El.Ed / D.Ed एवं CTET पेपर-1 अथवा पेपर-2 उत्तीर्ण अंक पत्र।
-- **काउंसलिंग हेतु आवश्यक प्रमाण पत्र:** 10वीं, 12वीं, स्नातक, बीएड अंकपत्र, निवास प्रमाण पत्र, जाति प्रमाण पत्र व चरित्र प्रमाण पत्र।
-
-### कट-ऑफ अंक श्रेणीवार:
-- **सामान्य वर्ग:** 60% अंक (90/150)
-- **ओबीसी / एससी / एसटी:** 55% अंक (82/150)
-
-चयनित अभ्यर्थियों को प्रथम चरण में जिला आवंटन 10 अगस्त तक कर दिया जाएगा।`
+                    {(() => {
+                      const jobArts = articles.filter(a => a.category === "job" || a.category === "jobs");
+                      if (jobArts.length === 0) {
+                        return (
+                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                          </div>
+                        );
                       }
-                    ].map((job, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => {
-                          const sampleArt: Article = {
-                            id: job.id,
-                            title: job.title,
-                            subtitle: `${job.title} - भर्ती विज्ञापन, पात्रता, आवेदन शुल्क और चयन प्रक्रिया की विस्तृत रिपोर्ट।`,
-                            content: job.detail,
-                            category: "job",
-                            author: "सारादेश करियर डेस्क",
-                            date: job.date,
-                            readTime: 3,
-                            image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=800&q=80",
-                            views: 1820 + idx * 300,
-                            likes: 120 + idx * 25,
-                            comments: [],
-                            tags: ["Govt Jobs", "SSC", "Sarkari Result", "Recruitment"],
-                            isBreaking: idx === 0,
-                            isFeatured: true,
-                            isTrending: true
-                          };
-                          handleArticleClick(sampleArt);
-                        }}
-                        className="bg-white border border-blue-150 hover:border-blue-400 rounded-xl p-3 cursor-pointer group hover:bg-blue-50/60 shadow-2xs transition-all duration-200"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs ${job.color}`}>
-                            {job.tag}
-                          </span>
-                          <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100/80 px-1.5 py-0.2 rounded font-sans">
-                            📅 {job.date}
-                          </span>
+                      return jobArts.slice(0, 4).map((art) => (
+                        <div 
+                          key={art.id}
+                          onClick={() => handleArticleClick(art)}
+                          className="bg-white border border-blue-150 hover:border-blue-400 rounded-xl p-3 cursor-pointer group hover:bg-blue-50/60 shadow-2xs transition-all duration-200"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-blue-600 text-white font-sans">
+                              {art.tags?.[0] || 'सरकारी नौकरी'}
+                            </span>
+                            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-100/80 px-1.5 py-0.2 rounded font-sans">
+                              📅 {art.date}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black leading-snug text-blue-900 group-hover:text-blue-700 transition-colors line-clamp-2">
+                            {art.title}
+                          </h4>
                         </div>
-                        <h4 className={`text-sm font-black leading-snug transition-colors line-clamp-2 ${job.titleColor}`}>
-                          {job.title}
-                        </h4>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
 
@@ -812,119 +746,35 @@ uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन
                   </div>
 
                   <div className="p-3 space-y-2.5">
-                    {[
-                      {
-                        id: "news-astro-1",
-                        tag: "आज का राशिफल",
-                        title: "दैनिक राशिफल (28 जुलाई 2026): मेष, सिंह और धनु राशि को अचानक धन लाभ व करियर में तरक्की",
-                        date: "28 जुलाई",
-                        color: "bg-purple-600 text-white",
-                        titleColor: "text-purple-900 hover:text-purple-700",
-                        detail: `आज 28 जुलाई 2026, श्रावण शुक्ल पक्ष की शुभ तिथि है। चंद्र देव धनु राशि में गोचर करेंगे। सूर्य और बुध का बुधादित्य राजयोग बनने से कई राशि के जातकों को विशेष आर्थिक लाभ प्राप्त होगा।
-
-## मुख्य 4 भाग्यशाली राशियाँ:
-- **मेष राशि:** व्यापार में अटका हुआ धन वापस मिलेगा। व्यावसायिक यात्राएं सफल रहेंगी। पारिवारिक वातावरण सुखद रहेगा।
-- **सिंह राशि:** समाज और कार्यस्थल पर पद-प्रतिष्ठा में वृद्धि होगी। अधिकारियों का पूर्ण सहयोग प्राप्त होगा।
-- **तुला राशि:** अचानक धन लाभ या नया व्यापार शुरू करने का सुनहरा अवसर मिलेगा। स्वास्थ्य में सुधार होगा।
-- **धनु राशि:** आपके आत्मविश्वास और पराक्रम में वृद्धि होगी। नई जिम्मेदारियां मिल सकती हैं।
-
-### आज के शुभ अंक एवं रंग:
-- **शुभ रंग:** केसरिया, पीला और सुनहरा।
-- **शुभ अंक:** 3, 7 और 9।
-
-## विशेष ज्योतिष सलाह:
-आज प्रात:काल भगवान सूर्य देव को तांबे के लोटे से अर्घ्य दें और माता लक्ष्मी की आरती करें। व्यापार में प्रगति होगी।`
-                      },
-                      {
-                        id: "news-astro-2",
-                        tag: "सावन विशेष",
-                        title: "सावन सोमवार विशेष: भगवान शिव की पूजा का शुभ मुहूर्त, जलाभिषेक विधि और राशि अनुसार उपाय",
-                        date: "27 जुलाई",
-                        color: "bg-fuchsia-600 text-white",
-                        titleColor: "text-fuchsia-900 hover:text-fuchsia-700",
-                        detail: `सावन मास के पवित्र सोमवार पर शिव मंदिरों में श्रद्धालुओं का जनसैलाब उमड़ पड़ा है। ज्योतिषाचार्यों के अनुसार सावन सोमवार पर भगवान भोलेनाथ की पूजा से सभी मनोकामनाएं पूर्ण होती हैं।
-
-## पूजन विधि व शुभ मुहूर्त:
-- **अभिजीत मुहूर्त:** दोपहर 11:55 बजे से 12:48 बजे तक।
-- **प्रदोष काल मुहूर्त:** सायं 06:45 बजे से 08:30 बजे तक।
-
-### शिवलिंग पर अर्पण करने योग्य सामग्रियां:
-1. **कच्चा दूध व गंगाजल:** मानसिक शांति व कष्टों से मुक्ति के लिए।
-2. **बेलपत्र व धतूरा:** धन-धान्य में वृद्धि व रोग निवारण हेतु।
-3. **शहद व भस्म:** ग्रह दोषों के निवारण हेतु।
-
-## राशि अनुसार अचूक उपाय:
-- **वृषभ व तुला राशि:** दूध में मिश्री मिलाकर जलाभिषेक करें।
-- **मकर व कुंभ राशि:** जल में काले तिल मिलाकर अर्पित करें।`
-                      },
-                      {
-                        id: "news-astro-3",
-                        tag: "बुधादित्य योग",
-                        title: "सूर्य व बुध का महागोचर: बुधादित्य राजयोग से 4 राशि वालों की चमकेगी किस्मत, धन-वैभव में वृद्धि",
-                        date: "26 जुलाई",
-                        color: "bg-pink-600 text-white",
-                        titleColor: "text-pink-900 hover:text-pink-700",
-                        detail: `ज्योतिष शास्त्र में ग्रहों के राजा सूर्य और बुद्धि के कारक बुध देव की युति को 'बुधादित्य राजयोग' कहा जाता है। इस शक्तिशाली योग का प्रभाव सभी 12 राशियों के करियर, व्यापार और वित्तीय जीवन पर पड़ता है।
-
-## राजयोग से लाभान्वित राशियाँ:
-- **मिथुन राशि:** बौद्धिक क्षमता में सुधार, शेयर बाजार व नए निवेश से बड़ा फायदा।
-- **कन्या राशि:** कार्यस्थल पर पदोन्नति व वेतन वृद्धि के प्रबल योग।
-- **वृश्चिक राशि:** संपत्ति की खरीद-बिक्री में अभूतपूर्व सफलता।
-- **मीन राशि:** विदेश यात्रा तथा उच्च शिक्षा के रास्ते प्रशस्त होंगे।`
-                      },
-                      {
-                        id: "news-astro-4",
-                        tag: "वास्तु शास्त्र",
-                        title: "वास्तु टिप्स: घर के मुख्य द्वार पर रखें ये 3 पवित्र चीजें, दूर होगी नकारात्मक ऊर्जा और आर्थिक तंगी",
-                        date: "25 जुलाई",
-                        color: "bg-violet-600 text-white",
-                        titleColor: "text-violet-900 hover:text-violet-700",
-                        detail: `वास्तु शास्त्र के अनुसार घर का मुख्य द्वार लक्ष्मी जी के आगमन का द्वार माना जाता है। यदि मुख्य द्वार पर वास्तु दोष हो तो घर में अशांति और आर्थिक तंगी बनी रहती है।
-
-## मुख्य द्वार के 3 चमत्कारी वास्तु उपाय:
-1. **तुलसी का पौधा व मनी प्लांट:** मुख्य द्वार के दाईं ओर तुलसी का पौधा रखें।
-2. **स्वास्तिक एवं ॐ चिन्ह:** सिंदूर से मुख्य द्वार पर स्वास्तिक बनाएं।
-3. **तांबे का लोटा या उरली:** तांबे के पात्र में ताजा जल और गेंदे के फूल तैरते हुए रखें। इससे घर में सकारात्मक ऊर्जा का प्रवाह होता है।`
+                    {(() => {
+                      const astroArts = articles.filter(a => a.category === "astrology" || a.category === "astro");
+                      if (astroArts.length === 0) {
+                        return (
+                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                          </div>
+                        );
                       }
-                    ].map((astro, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => {
-                          const sampleArt: Article = {
-                            id: astro.id,
-                            title: astro.title,
-                            subtitle: `${astro.title} - वरिष्ठ ज्योतिषाचार्यों द्वारा ग्रहों के गोचर और पंचांग के आधार पर विशेष विश्लेषण।`,
-                            content: astro.detail,
-                            category: "astrology",
-                            author: "ज्योतिष ज्ञान पीठ",
-                            date: astro.date,
-                            readTime: 3,
-                            image: "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=800&q=80",
-                            views: 2300 + idx * 400,
-                            likes: 210 + idx * 30,
-                            comments: [],
-                            tags: ["Astrology", "Rashifal", "Horoscope", "Panchang"],
-                            isBreaking: false,
-                            isFeatured: true,
-                            isTrending: true
-                          };
-                          handleArticleClick(sampleArt);
-                        }}
-                        className="bg-white border border-purple-150 hover:border-purple-400 rounded-xl p-3 cursor-pointer group hover:bg-purple-50/60 shadow-2xs transition-all duration-200"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs ${astro.color}`}>
-                            {astro.tag}
-                          </span>
-                          <span className="text-[9px] font-extrabold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded font-sans">
-                            ✨ {astro.date}
-                          </span>
+                      return astroArts.slice(0, 4).map((art) => (
+                        <div 
+                          key={art.id}
+                          onClick={() => handleArticleClick(art)}
+                          className="bg-white border border-purple-150 hover:border-purple-400 rounded-xl p-3 cursor-pointer group hover:bg-purple-50/60 shadow-2xs transition-all duration-200"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-purple-600 text-white font-sans">
+                              {art.tags?.[0] || 'ज्योतिष'}
+                            </span>
+                            <span className="text-[9px] font-extrabold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded font-sans">
+                              ✨ {art.date}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black leading-snug text-purple-900 group-hover:text-purple-700 transition-colors line-clamp-2">
+                            {art.title}
+                          </h4>
                         </div>
-                        <h4 className={`text-sm font-black leading-snug transition-colors line-clamp-2 ${astro.titleColor}`}>
-                          {astro.title}
-                        </h4>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
 
@@ -947,125 +797,35 @@ uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन
                   </div>
 
                   <div className="p-3 space-y-2.5">
-                    {[
-                      {
-                        id: "news-scheme-1",
-                        tag: "PM किसान",
-                        title: "PM किसान सम्मान निधि: 19वीं किश्त के ₹2,000 सीधे किसानों के बैंक खातों में ट्रांसफर, लिस्ट देखें",
-                        date: "28 जुलाई",
-                        color: "bg-emerald-600 text-white",
-                        titleColor: "text-emerald-900 hover:text-emerald-700",
-                        detail: `केंद्र सरकार द्वारा संचालित प्रधानमंत्री किसान सम्मान निधि योजना (PM-KISAN) की 19वीं किस्त का इंतजार कर रहे करोड़ों किसानों के लिए बड़ी खुशखबरी है। आज प्रत्यक्ष लाभ अंतरण (DBT) के माध्यम से देश भर के 10 करोड़ से अधिक पात्र किसान परिवारों के बैंक खातों में ₹2,000 की राशि सीधे भेजी जा चुकी है।
-
-## योजना की प्रमुख विशेषताएं:
-- **वार्षिक वित्तीय सहायता:** ₹6,000 (3 समान किस्तों में ₹2,000-₹2,000)।
-- **पारदर्शिता:** राशि सीधे आधार लिंक बैंक खाते में जमा होती है।
-
-### अपनी किस्त का स्टेटस कैसे चेक करें?
-1. योजना की आधिकारिक वेबसाइट **pmkisan.gov.in** पर जाएं।
-2. **'Know Your Status'** या **'Beneficiary List'** ऑप्शन पर क्लिक करें।
-3. अपना पंजीकरण संख्या (Registration No.) और कैप्चा दर्ज करें।
-4. स्क्रीन पर आपकी 19वीं किस्त का स्टेटस दिखाई दे जाएगा।
-
-## ई-केवाईसी (e-KYC) क्यों अनिवार्य है?
-जिन किसानों की किस्त रुक गई है, उनका मुख्य कारण आधार और बैंक पासबुक में नाम का अंतर अथवा ई-केवाईसी अधूरा होना है। किसान अपने नजदीकी सीएससी (CSC) केंद्र पर जाकर बायोमेट्रिक ई-केवाईसी अवश्य करा लें।
-
-### सहायता हेल्पलाइन:
-- **टोल-फ्री नंबर:** 1800-115-526
-- **ईमेल:** pmkisan-ict@gov.in`
-                      },
-                      {
-                        id: "news-scheme-2",
-                        tag: "PM आवास",
-                        title: "PM आवास योजना 2.0: 3 लाख नए ग्रामीण व शहरी परिवारों को पक्का मकान, ऑनलाइन सूची जारी",
-                        date: "27 जुलाई",
-                        color: "bg-teal-600 text-white",
-                        titleColor: "text-teal-900 hover:text-teal-700",
-                        detail: `प्रधानमंत्री आवास योजना (PMAY 2.0) के तहत केंद्र सरकार ने देश भर के बेघर और कच्चे मकानों में रहने वाले 3 लाख नए निर्धन परिवारों को पक्का मकान बनाने हेतु आर्थिक अनुदान स्वीकृत कर दिया है।
-
-## मिलने वाली आर्थिक सहायता:
-- **मैदानी क्षेत्र (Plain Areas):** ₹1,20,000 की आर्थिक मदद।
-- **पहाड़ी एवं दुर्गम क्षेत्र:** ₹1,30,000 अनुदान + मनरेगा मजदूरी ₹25,000।
-- **शौचालय निर्माण हेतु:** ₹12,000 अतिरिक्त राशि।
-
-### आवेदन हेतु आवश्यक दस्तावेज:
-- आधार कार्ड, बैंक पासबुक, आय प्रमाण पत्र, जॉब कार्ड तथा भूमि का खसरा-खतौनी।
-
-ऑनलाइन आवेदन के लिए pmaymis.gov.in पर विजिट करें अथवा अपने ग्राम पंचायत सचिव से संपर्क करें।`
-                      },
-                      {
-                        id: "news-scheme-3",
-                        tag: "आयुष्मान कार्ड",
-                        title: "आयुष्मान भारत योजना: 70 वर्ष से अधिक बुजुर्गों के लिए ₹5 लाख का मुफ्त इलाज कार्ड बनना शुरू",
-                        date: "26 जुलाई",
-                        color: "bg-green-700 text-white",
-                        titleColor: "text-green-900 hover:text-green-700",
-                        detail: `स्वास्थ्य एवं परिवार कल्याण मंत्रालय ने आयुष्मान भारत प्रधानमंत्री जन आरोग्य योजना (AB-PMJAY) के दायरे में बड़ा विस्तार करते हुए देश के सभी 70 वर्ष या उससे अधिक आयु के वरिष्ठ नागरिकों के लिए ₹5 लाख का स्वास्थ्य बीमा सुरक्षा कवर प्रदान करने का निर्णय लिया है।
-
-## योजना के मुख्य लाभ:
-- **आय सीमा का कोई बंधन नहीं:** सभी वरिष्ठ नागरिकों को चाहे उनकी आय कुछ भी हो, कार्ड मिलेगा।
-- **अस्पतालों की सूची:** देश भर के 29,000 से अधिक सूचीबद्ध सरकारी एवं निजी अस्पतालों में कैशलेस इलाज।
-
-### आयुष्मान कार्ड कैसे बनवाएं?
-1. **Ayushman App** अपने स्मार्टफोन में डाउनलोड करें।
-2. अपना आधार नंबर दर्ज करके OTP से लॉगिन करें।
-3. परिवार के बुजुर्गों का ई-केवाईसी पूरा करके डिजिटल कार्ड डाउनलोड कर लें।`
-                      },
-                      {
-                        id: "news-scheme-4",
-                        tag: "लाडली बहना",
-                        title: "लाडली बहना / महतारी वंदन योजना: महिलाओं के खाते में ₹1,500 की नई किस्त इस दिन होगी जमा",
-                        date: "25 जुलाई",
-                        color: "bg-rose-600 text-white",
-                        titleColor: "text-rose-900 hover:text-rose-700",
-                        detail: `राज्य सरकार द्वारा महिलाओं के आर्थिक सशक्तीकरण हेतु चलाई जा रही लाडली बहना एवं महतारी वंदन योजना की अगली मासिक किस्त की तिथि घोषित कर दी गई है।
-
-## योजना के मुख्य बिंदु:
-- **मासिक सहायता राशि:** ₹1,250 से बढ़ाकर ₹1,500 प्रति माह की गई।
-- **भुगतान माध्यम:** बैंक खाते में डीबीटी (Direct Benefit Transfer)।
-
-### भुगतान न होने पर क्या करें?
-यदि किसी महिला के खाते में किस्त की राशि प्राप्त नहीं हुई है, तो वे तुरंत अपने बैंक शाखा में जाकर डीबीटी (DBT) तथा आधार एनपीसीआई (NPCI) मैपिंग सक्रिय करवा लें।`
+                    {(() => {
+                      const schemeArts = articles.filter(a => a.category === "schemes" || a.category === "scheme" || a.category === "yojna");
+                      if (schemeArts.length === 0) {
+                        return (
+                          <div className="p-4 text-center text-xs text-neutral-500 font-medium font-sans">
+                            इस श्रेणी में फिलहाल कोई समाचार उपलब्ध नहीं है।
+                          </div>
+                        );
                       }
-                    ].map((scheme, idx) => (
-                      <div 
-                        key={idx}
-                        onClick={() => {
-                          const sampleArt: Article = {
-                            id: scheme.id,
-                            title: scheme.title,
-                            subtitle: `${scheme.title} - केंद्र एवं राज्य सरकार की कल्याणकारी योजनाओं के ऑनलाइन पंजीकरण और पात्रता की संपूर्ण गाइड।`,
-                            content: scheme.detail,
-                            category: "schemes",
-                            author: "सरकारी योजना विशेष डेस्क",
-                            date: scheme.date,
-                            readTime: 3,
-                            image: "https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=800&q=80",
-                            views: 2190 + idx * 350,
-                            likes: 190 + idx * 20,
-                            comments: [],
-                            tags: ["Govt Schemes", "Yojna", "Benefits", "Sarkari Yojna"],
-                            isBreaking: idx === 0,
-                            isFeatured: true,
-                            isTrending: true
-                          };
-                          handleArticleClick(sampleArt);
-                        }}
-                        className="bg-white border border-emerald-150 hover:border-emerald-400 rounded-xl p-3 cursor-pointer group hover:bg-emerald-50/60 shadow-2xs transition-all duration-200"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs ${scheme.color}`}>
-                            {scheme.tag}
-                          </span>
-                          <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded font-sans">
-                            📜 {scheme.date}
-                          </span>
+                      return schemeArts.slice(0, 4).map((art) => (
+                        <div 
+                          key={art.id}
+                          onClick={() => handleArticleClick(art)}
+                          className="bg-white border border-emerald-150 hover:border-emerald-400 rounded-xl p-3 cursor-pointer group hover:bg-emerald-50/60 shadow-2xs transition-all duration-200"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-2xs bg-emerald-600 text-white font-sans">
+                              {art.tags?.[0] || 'सरकारी योजना'}
+                            </span>
+                            <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded font-sans">
+                              📜 {art.date}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black leading-snug text-emerald-900 group-hover:text-emerald-700 transition-colors line-clamp-2">
+                            {art.title}
+                          </h4>
                         </div>
-                        <h4 className={`text-sm font-black leading-snug transition-colors line-clamp-2 ${scheme.titleColor}`}>
-                          {scheme.title}
-                        </h4>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
 

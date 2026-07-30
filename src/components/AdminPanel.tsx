@@ -66,6 +66,106 @@ const extractInlineImages = (text: string) => {
   return images;
 };
 
+// Smart Parser for Bulk Pasted News Articles
+const parseBatchNewsText = (text: string) => {
+  if (!text.trim()) return [];
+
+  // Split text into blocks by looking for number prefixes like 1. or 1: or [1] or खबर 1 or --- or 2+ newlines
+  const rawBlocks = text
+    .split(/\n\s*(?:(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]|\[[0-9]+\]|खबर\s*[0-9]+|न्यूज\s*[0-9]+|---|\={3,})\s*/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
+  let blocksToProcess = rawBlocks;
+  if (blocksToProcess.length <= 1) {
+    // Fallback: split by 2 or more empty lines
+    blocksToProcess = text.split(/\n\s*\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  }
+  if (blocksToProcess.length <= 1) {
+    // Fallback: split by 2 newlines
+    blocksToProcess = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  }
+
+  return blocksToProcess.map((block, idx) => {
+    const lines = block.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    
+    let title = lines[0] || `समाचार #${idx + 1}`;
+    // Clean leading numbers or prefixes from title if any
+    title = title.replace(/^(?:[0-9]+|[\u0966-\u096F]+)[\.\:\)]\s*/, '').replace(/^(?:शीर्षक|Heading|Title|खबर|न्यूज)[\.\:\)]?\s*/i, '');
+
+    let subtitle = "";
+    let contentStartIdx = 1;
+
+    if (lines.length > 1) {
+      if (
+        lines[1].toLowerCase().startsWith("सबटाइटल") || 
+        lines[1].toLowerCase().startsWith("उप-शीर्षक") || 
+        lines[1].toLowerCase().startsWith("sub") || 
+        (lines[1].length < 120 && lines.length > 2)
+      ) {
+        subtitle = lines[1].replace(/^(?:सबटाइटल|उप-शीर्षक|Subtitle|Sub)[\.\:\)]?\s*/i, '');
+        contentStartIdx = 2;
+      }
+    }
+
+    // Keep ALL remaining text intact as content!
+    const contentLines = lines.slice(contentStartIdx);
+    let content = contentLines.join("\n\n");
+    if (!content) {
+      content = title;
+    }
+
+    // Extract tags if present
+    let tags: string[] = [];
+    const tagMatch = content.match(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*(.+)$/im);
+    if (tagMatch) {
+      tags = tagMatch[1].split(/[\,\s\#]+/).map(t => t.trim()).filter(Boolean);
+      content = content.replace(/(?:टैग|टैग्स|Tags)\s*[\:\=]\s*.+$/im, '').trim();
+    } else {
+      const hashTags = content.match(/#[^\s#]+/g);
+      if (hashTags) {
+        tags = hashTags.map(t => t.replace('#', ''));
+      }
+    }
+
+    // Auto detect category from text
+    let category = "national";
+    const lowerFull = (title + " " + content).toLowerCase();
+    if (lowerFull.includes("नौकरी") || lowerFull.includes("सर्कल") || lowerFull.includes("भर्ती") || lowerFull.includes("sarkari result") || lowerFull.includes("ssc") || lowerFull.includes("job") || lowerFull.includes("vacancy")) {
+      category = "jobs";
+    } else if (lowerFull.includes("राशिफल") || lowerFull.includes("ज्योतिष") || lowerFull.includes("ग्रह") || lowerFull.includes("मेष") || lowerFull.includes("सिंह") || lowerFull.includes("astro")) {
+      category = "astrology";
+    } else if (lowerFull.includes("योजना") || lowerFull.includes("किसान") || lowerFull.includes("पेंशन") || lowerFull.includes("सब्सिडी") || lowerFull.includes("गवर्नमेंट स्कीम") || lowerFull.includes("स्कीम")) {
+      category = "schemes";
+    } else if (lowerFull.includes("मैच") || lowerFull.includes("क्रिकेट") || lowerFull.includes("खेल") || lowerFull.includes("ओलंपिक") || lowerFull.includes("ipl") || lowerFull.includes("sports")) {
+      category = "sports";
+    } else if (lowerFull.includes("फिल्म") || lowerFull.includes("बॉलीवुड") || lowerFull.includes("सिनेमा") || lowerFull.includes("अभिनेता") || lowerFull.includes("अभिनेत्री") || lowerFull.includes("actor")) {
+      category = "entertainment";
+    } else if (lowerFull.includes("शेयर") || lowerFull.includes("स्टॉक") || lowerFull.includes("मार्केट") || lowerFull.includes("सोना") || lowerFull.includes("बैंक") || lowerFull.includes("जीएसटी")) {
+      category = "business";
+    } else if (lowerFull.includes("मोबाइल") || lowerFull.includes("स्मार्टफोन") || lowerFull.includes("टेक्नोलॉजी") || lowerFull.includes("आईफोन") || lowerFull.includes("ऐप")) {
+      category = "tech";
+    }
+
+    if (!subtitle) {
+      subtitle = content.length > 100 ? content.substring(0, 100) + "..." : content;
+    }
+
+    return {
+      id: `batch-art-${Date.now()}-${idx}`,
+      title,
+      subtitle,
+      content, // FULL INTACT CONTENT
+      category,
+      state: "",
+      author: "सारादेश.in विशेष टीम",
+      tags: tags.length > 0 ? tags : ["मुख्य समाचार", "सारादेश"],
+      checked: true,
+      assignedImageIndex: idx
+    };
+  });
+};
+
 export default function AdminPanel() {
   // Authentication states
   const [passwordInput, setPasswordInput] = useState("");
@@ -76,7 +176,14 @@ export default function AdminPanel() {
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch">("list");
+  
+  // Bulk Batch Importer & Photo Matcher States
+  const [batchNewsText, setBatchNewsText] = useState("");
+  const [batchImages, setBatchImages] = useState<{ id: string; url: string; fileName: string; fileNumber: number }[]>([]);
+  const [batchArticles, setBatchArticles] = useState<any[]>([]);
+  const [publishingBatch, setPublishingBatch] = useState(false);
+  const [batchError, setBatchError] = useState("");
   
   // AI Screenshot news generator States
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
@@ -423,6 +530,159 @@ export default function AdminPanel() {
     }
   };
 
+  // Bulk Batch Importer & Photo Matcher Handlers
+  const handleBatchImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newImages: { id: string; url: string; fileName: string; fileNumber: number }[] = [];
+    const existingCount = batchImages.length;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const compressedUrl = await compressImageFile(file, 1000, 0.75);
+      newImages.push({
+        id: `batch-img-${Date.now()}-${i}`,
+        url: compressedUrl,
+        fileName: file.name,
+        fileNumber: existingCount + i + 1
+      });
+    }
+
+    setBatchImages(prev => [...prev, ...newImages]);
+  };
+
+  const handleRemoveBatchImage = (id: string) => {
+    setBatchImages(prev => {
+      const filtered = prev.filter(img => img.id !== id);
+      return filtered.map((img, idx) => ({ ...img, fileNumber: idx + 1 }));
+    });
+  };
+
+  const handleMixBatch = () => {
+    setBatchError("");
+    if (!batchNewsText.trim()) {
+      setBatchError("कृपया पहले खबरें (टेक्स्ट) पेस्ट करें।");
+      return;
+    }
+
+    const parsed = parseBatchNewsText(batchNewsText);
+    if (parsed.length === 0) {
+      setBatchError("खबरों के टेक्स्ट से कोई समाचार विच्छेदित नहीं हो पाया। कृपया अलग-अलग नंबर लगाकर फिर से पेस्ट करें।");
+      return;
+    }
+
+    // Pair photos sequentially or default
+    const articlesWithImages = parsed.map((art, idx) => {
+      let selectedImgUrl = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80";
+      if (batchImages.length > 0) {
+        const imgIndex = idx % batchImages.length;
+        selectedImgUrl = batchImages[imgIndex].url;
+      }
+      return {
+        ...art,
+        assignedImageIndex: batchImages.length > 0 ? (idx % batchImages.length) : -1,
+        image: selectedImgUrl
+      };
+    });
+
+    setBatchArticles(articlesWithImages);
+  };
+
+  const handleBatchArticleFieldChange = (id: string, field: string, value: any) => {
+    setBatchArticles(prev =>
+      prev.map(art => {
+        if (art.id !== id) return art;
+        const updated = { ...art, [field]: value };
+        if (field === "assignedImageIndex") {
+          const imgIdx = Number(value);
+          if (imgIdx >= 0 && imgIdx < batchImages.length) {
+            updated.image = batchImages[imgIdx].url;
+          }
+        }
+        return updated;
+      })
+    );
+  };
+
+  const handleShiftBatchArticleImage = (id: string, direction: "up" | "down") => {
+    setBatchArticles(prev =>
+      prev.map(art => {
+        if (art.id !== id) return art;
+        let currentIndex = art.assignedImageIndex >= 0 ? art.assignedImageIndex : 0;
+        let newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+        if (newIndex < 0) newIndex = batchImages.length - 1;
+        if (newIndex >= batchImages.length) newIndex = 0;
+
+        return {
+          ...art,
+          assignedImageIndex: newIndex,
+          image: batchImages[newIndex] ? batchImages[newIndex].url : art.image
+        };
+      })
+    );
+  };
+
+  const toggleBatchArticleSelect = (id: string) => {
+    setBatchArticles(prev =>
+      prev.map(art => (art.id === id ? { ...art, checked: !art.checked } : art))
+    );
+  };
+
+  const toggleAllBatchArticles = (select: boolean) => {
+    setBatchArticles(prev => prev.map(art => ({ ...art, checked: select })));
+  };
+
+  const handlePublishBatchArticles = async () => {
+    const selectedArticles = batchArticles.filter(art => art.checked);
+    if (selectedArticles.length === 0) {
+      alert("कृपया पब्लिश करने के लिए कम से कम एक समाचार का चयन करें।");
+      return;
+    }
+
+    setPublishingBatch(true);
+    try {
+      let successCount = 0;
+      for (const art of selectedArticles) {
+        const tagList = Array.isArray(art.tags) 
+          ? art.tags 
+          : (typeof art.tags === "string" ? art.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : ["मुख्य समाचार"]);
+
+        const res = await fetch("/api/news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: art.title,
+            subtitle: art.subtitle,
+            content: art.content,
+            category: art.category,
+            state: art.state || undefined,
+            image: art.image,
+            author: art.author,
+            tags: tagList,
+            isBreaking: false,
+            isFeatured: false,
+            isTrending: true
+          })
+        });
+        if (res.ok) {
+          successCount++;
+        }
+      }
+      alert(`सफलतापूर्वक ${successCount} नई खबरें सही-सही फोटो एवं श्रेणी के साथ लाइव पब्लिश कर दी गई हैं!`);
+      setBatchArticles([]);
+      setBatchNewsText("");
+      setBatchImages([]);
+      loadArticles();
+      setActiveTab("list");
+    } catch (err: any) {
+      console.error(err);
+      alert("खबरें प्रकाशित करते समय कुछ समस्या आई: " + err.message);
+    } finally {
+      setPublishingBatch(false);
+    }
+  };
+
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPass = passwordInput.trim();
@@ -688,6 +948,16 @@ export default function AdminPanel() {
           }`}
         >
           ➕ नया समाचार (मैनुअल/एआई लेखक)
+        </button>
+        <button
+          onClick={() => setActiveTab("batch")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "batch"
+              ? "border-[#ff6f00] text-[#ff6f00]"
+              : "border-transparent text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          🔀 बल्क न्यूज़ + फोटो मिक्सर
         </button>
         <button
           onClick={() => setActiveTab("compiler")}
@@ -2036,6 +2306,433 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: BULK BATCH NEWS & PHOTO MATCHER */}
+      {activeTab === "batch" && (
+        <div className="space-y-6 pb-20">
+          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 text-white rounded-xl p-6 md:p-8 shadow-md">
+            <div className="max-w-4xl">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-white text-[#ff6f00] text-[11px] font-black uppercase px-3 py-1 rounded font-sans tracking-wider">
+                  सिस्टमैटिक बल्क एग्रीगेटर
+                </span>
+                <span className="text-xs text-orange-100 font-sans">100% कंटेंट सुरक्षित • मल्टी फोटो मैचिंग</span>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black tracking-tight">🔀 मल्टीपल समाचार एवं फ़ोटो मिक्सर (Bulk News & Photo Matcher)</h3>
+              <p className="text-xs md:text-sm text-orange-50 leading-relaxed font-sans mt-2">
+                ऊपर बॉक्स में एक साथ कई समाचार (नंबर 1, 2, 3... शीर्षक, उप-शीर्षक, विस्तृत समाचार व टैग्स) पेस्ट करें। नीचे दूसरे बॉक्स में अपनी कई फ़ोटो एक साथ अपलोड करें (फ़ोटो #1, #2, #3...)। 
+                इसके बाद <strong>"मिश्रण करें (Mix)"</strong> बटन दबाते ही हर खबर अपनी-अपनी फोटो के साथ लाइन से तैयार हो जाएगी। आप किसी भी खबर की फोटो को ड्रॉपडाउन या ऊपर/नीचे बटन दबाकर बदलकर सेट कर सकते हैं और एक क्लिक में सभी खबरों को लाइव पब्लिश कर सकते हैं!
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Box 1: Multiple News Input Textarea */}
+            <div className="space-y-4">
+              <div className="bg-white border border-neutral-200 rounded-xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-3 border-b pb-2">
+                  <span className="font-black text-xs text-neutral-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#ff6f00] rounded-full"></span>
+                    <span>1. कई समाचार पेस्ट करें (Paste News Text)</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBatchNewsText(
+                          `1. शीर्षक: भारत ने क्रिकेट सीरीज में दर्ज की ऐतिहासिक जीत\nउप-शीर्षक: फाइनल मुकाबले में इंग्लैंड को 6 विकेट से हराया\nविस्तृत खबर: नई दिल्ली के अरुण जेटली स्टेडियम में खेले गए अंतिम एकदिवसीय मैच में भारतीय टीम ने शानदार प्रदर्शन करते हुए जीत हासिल की। बल्लेबाजों के दमदार प्रदर्शन और गेंदबाजों की धारदार गेंदबाजी के सामने मेहमान टीम टिक नहीं पाई।\nटैग्स: क्रिकेट, टीम इंडिया, खेल जगत\n\n2. शीर्षक: सरकारी नौकरियों में बंपर भर्ती का नोटिफिकेशन जारी\nउप-शीर्षक: एसएससी ने 12,000 पदों के लिए मांगे ऑनलाइन आवेदन\nविस्तृत खबर: कर्मचारी चयन आयोग (SSC) ने विभिन्न मंत्रालयों और विभागों में खाली पड़े पदों को भरने के लिए अधिसूचना जारी कर दी है। योग्य अभ्यर्थी आधिकारिक वेबसाइट पर जाकर आवेदन कर सकते हैं। आयु सीमा और योग्यता मानदंड जारी कर दिए गए हैं।\nटैग्स: सरकारी नौकरी, भर्ती 2026, एसएससी\n\n3. शीर्षक: आज का राशिफल: जानें किन राशियों का चमकेगा भाग्य\nउप-शीर्षक: मेष, सिंह और धनु राशि वालों के लिए विशेष लाभ के योग\nविस्तृत खबर: आज का दिन कई राशि के जातकों के लिए आर्थिक दृष्टि से फलदायी रहने वाला है। व्यापार में निवेश करने से पहले वरिष्ठों की सलाह अवश्य लें। परिवार में मांगलिक कार्यों की रूपरेखा बनेगी।\nटैग्स: राशिफल, ज्योतिष, दैनिक भविष्यफल`
+                        );
+                      }}
+                      className="text-[10px] text-[#ff6f00] hover:underline font-bold bg-orange-50 px-2 py-0.5 rounded cursor-pointer"
+                    >
+                      नमूना (Sample Text) भरें
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBatchNewsText("")}
+                      className="text-[10px] text-red-600 hover:underline font-bold cursor-pointer"
+                    >
+                      साफ़ करें
+                    </button>
+                  </div>
+                </div>
+
+                <textarea
+                  value={batchNewsText}
+                  onChange={(e) => setBatchNewsText(e.target.value)}
+                  placeholder="यहाँ नंबर लगाकर कई सारे समाचार शीर्षक, सब-टाइटल और विस्तृत विवरण के साथ पेस्ट करें (जैसे 1. शीर्षक ... 2. शीर्षक ...)"
+                  rows={14}
+                  className="w-full text-xs p-4 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-sans leading-relaxed resize-y text-neutral-800"
+                ></textarea>
+                <p className="text-[10px] text-neutral-400 mt-1 font-sans">
+                  💡 नोट: किसी भी समाचार का कोई भी कंटेंट कटेगा-छंटेगा नहीं, पूरा मैटर वैसा ही रहेगा।
+                </p>
+              </div>
+            </div>
+
+            {/* Box 2: Multi-Image Upload Box */}
+            <div className="space-y-4">
+              <div className="bg-white border border-neutral-200 rounded-xl p-5 shadow-xs flex flex-col justify-between min-h-[460px]">
+                <div>
+                  <div className="flex items-center justify-between mb-3 border-b pb-2">
+                    <span className="font-black text-xs text-neutral-800 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                      <span>2. कई फ़ोटो एक साथ अपलोड करें (Upload Multiple Photos)</span>
+                    </span>
+                    {batchImages.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBatchImages([])}
+                        className="text-[10px] text-red-600 hover:underline font-bold cursor-pointer"
+                      >
+                        सभी फ़ोटो हटाएं
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Upload button area */}
+                  <div className="mb-4">
+                    <label htmlFor="batch-images-input" className="block w-full cursor-pointer">
+                      <div className="border-2 border-dashed border-neutral-300 hover:border-[#ff6f00] bg-neutral-50 hover:bg-orange-50/30 rounded-xl p-5 text-center transition-all">
+                        <Upload className="w-6 h-6 text-[#ff6f00] mx-auto mb-1 animate-bounce" />
+                        <span className="text-xs font-bold text-neutral-800 block">
+                          यहाँ क्लिक करके कई फ़ोटो एक साथ चुनें (Select Multiple Images)
+                        </span>
+                        <span className="text-[10px] text-neutral-400 font-sans block mt-0.5">
+                          जितनी भी फ़ोटो आप चुनेंगे वे नंबर 1, 2, 3... के साथ सेट हो जाएँगी
+                        </span>
+                      </div>
+                      <input
+                        type="file"
+                        id="batch-images-input"
+                        multiple
+                        accept="image/*"
+                        onChange={handleBatchImagesUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Image Grid with Numbers */}
+                  {batchImages.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-wider font-sans">
+                        अपलोड की गई कुल फ़ोटो: ({batchImages.length})
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
+                        {batchImages.map((img) => (
+                          <div key={img.id} className="relative group border rounded-lg overflow-hidden bg-neutral-100 h-24">
+                            <img src={img.url} alt={img.fileName} className="w-full h-full object-cover" />
+                            <div className="absolute top-1 left-1 bg-black/80 backdrop-blur-md text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+                              फ़ोटो #{img.fileNumber}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBatchImage(img.id)}
+                              className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+                              title="हटाएं"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] px-1 py-0.5 truncate font-sans">
+                              {img.fileName}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {batchImages.length === 0 && (
+                    <div className="py-12 text-center text-neutral-400 font-sans space-y-1">
+                      <ImageIcon className="w-8 h-8 text-neutral-300 mx-auto" />
+                      <p className="text-xs font-bold text-neutral-500">अभी कोई फ़ोटो अपलोड नहीं है।</p>
+                      <p className="text-[10px] text-neutral-400">आप बिना फ़ोटो के भी आगे बढ़कर डिफ़ॉल्ट इमेज रख सकते हैं।</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* MIX BUTTON */}
+                <div className="mt-4 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={handleMixBatch}
+                    className="w-full py-4 bg-gradient-to-r from-[#ff6f00] to-amber-600 hover:from-amber-600 hover:to-[#ff6f00] text-white font-black text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                  >
+                    <Sparkles className="w-5 h-5 text-amber-200 animate-spin" />
+                    <span>मिश्रण करें एवं व्यवस्थित देखें (Mix & Systemic Align) 🔀</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {batchError && (
+            <div className="text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-center gap-2 font-sans">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>{batchError}</span>
+            </div>
+          )}
+
+          {/* SYSTEMIC MIXED RESULT CARDS */}
+          {batchArticles.length > 0 && (
+            <div className="space-y-6 pt-6 border-t-2 border-neutral-200">
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-neutral-900 text-white p-5 rounded-xl shadow-md">
+                <div>
+                  <h4 className="text-base font-black flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#ff6f00] rounded-full inline-block"></span>
+                    <span>सिस्टमैटिक लाइन में तैयार खबरें ({batchArticles.length})</span>
+                  </h4>
+                  <p className="text-xs text-neutral-400 font-sans mt-0.5">
+                    यहाँ हर खबर के सामने उसकी अपलोड की गई फ़ोटो लग चुकी है। आप ड्रॉपडाउन या ऊपर/नीचे बटन दबाकर किसी भी खबर की फ़ोटो आसानी से चेंज कर सकते हैं।
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleAllBatchArticles(true)}
+                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-md transition-all cursor-pointer"
+                  >
+                    सब चुनें ☑️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleAllBatchArticles(false)}
+                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold rounded-md transition-all cursor-pointer"
+                  >
+                    सब हटाएं 🗑️
+                  </button>
+                </div>
+              </div>
+
+              {/* LIST OF PARSED ARTICLES */}
+              <div className="space-y-6">
+                {batchArticles.map((art, index) => (
+                  <div
+                    key={art.id}
+                    className={`bg-white border-2 rounded-2xl p-5 md:p-6 shadow-sm transition-all space-y-4 ${
+                      art.checked ? "border-[#ff6f00]/60 bg-orange-50/5" : "border-neutral-200 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between border-b pb-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={!!art.checked}
+                          onChange={() => toggleBatchArticleSelect(art.id)}
+                          className="w-5 h-5 rounded accent-[#ff6f00] cursor-pointer"
+                        />
+                        <span className="text-xs font-black text-white bg-neutral-900 px-3 py-1 rounded-full font-mono">
+                          खबर #{index + 1}
+                        </span>
+                        {art.assignedImageIndex >= 0 && batchImages[art.assignedImageIndex] && (
+                          <span className="text-xs font-extrabold text-[#ff6f00] bg-orange-100 px-2.5 py-0.5 rounded font-sans">
+                            मैच फ़ोटो #{batchImages[art.assignedImageIndex].fileNumber}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-xs font-bold text-neutral-400 font-sans">
+                        सामग्री आकार: {art.content.length} अक्षर (पूरा सुरक्षित)
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Left 2 Cols: Form Fields */}
+                      <div className="lg:col-span-2 space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                            शीर्षक (Title):
+                          </label>
+                          <input
+                            type="text"
+                            value={art.title}
+                            onChange={(e) => handleBatchArticleFieldChange(art.id, "title", e.target.value)}
+                            className="w-full text-sm font-bold p-2.5 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none text-neutral-900 bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                            उप-शीर्षक (Subtitle):
+                          </label>
+                          <input
+                            type="text"
+                            value={art.subtitle}
+                            onChange={(e) => handleBatchArticleFieldChange(art.id, "subtitle", e.target.value)}
+                            className="w-full text-xs font-medium p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none text-neutral-700 bg-white font-sans"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 font-sans">
+                          <div>
+                            <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                              श्रेणी (Category):
+                            </label>
+                            <select
+                              value={art.category}
+                              onChange={(e) => handleBatchArticleFieldChange(art.id, "category", e.target.value)}
+                              className="w-full text-xs font-bold p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none bg-white text-neutral-900"
+                            >
+                              {CATEGORIES.filter(c => c.key !== "all").map(cat => (
+                                <option key={cat.key} value={cat.key}>{cat.hindiName}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                              राज्य (State):
+                            </label>
+                            <select
+                              value={art.state || ""}
+                              onChange={(e) => handleBatchArticleFieldChange(art.id, "state", e.target.value)}
+                              className="w-full text-xs p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none bg-white text-neutral-800"
+                            >
+                              <option value="">कोई राज्य नहीं (All India)</option>
+                              {STATES.filter(s => s !== "सभी राज्य").map(st => (
+                                <option key={st} value={st}>{st}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                            पूरा विस्तृत समाचार (Content - No Truncation):
+                          </label>
+                          <textarea
+                            value={art.content}
+                            onChange={(e) => handleBatchArticleFieldChange(art.id, "content", e.target.value)}
+                            rows={6}
+                            className="w-full text-xs p-3 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none font-sans leading-relaxed text-neutral-800 bg-white resize-y"
+                          ></textarea>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-wider mb-1">
+                            टैग्स (Tags comma separated):
+                          </label>
+                          <input
+                            type="text"
+                            value={Array.isArray(art.tags) ? art.tags.join(", ") : art.tags}
+                            onChange={(e) => handleBatchArticleFieldChange(art.id, "tags", e.target.value)}
+                            className="w-full text-xs p-2 border border-neutral-300 rounded-lg focus:border-[#ff6f00] outline-none text-neutral-700 bg-white font-sans"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right 1 Col: Photo Assignment & Controls */}
+                      <div className="bg-neutral-50 p-4 border rounded-xl space-y-3 flex flex-col justify-between">
+                        <div>
+                          <span className="block text-[10px] font-black text-neutral-700 uppercase tracking-wider mb-2">
+                            🖼️ खबर की फोटो सेट करें (Image Selection):
+                          </span>
+
+                          <div className="relative h-44 rounded-lg overflow-hidden border bg-neutral-200 mb-3 shadow-inner">
+                            <img src={art.image} alt="" className="w-full h-full object-cover" />
+                            {art.assignedImageIndex >= 0 && batchImages[art.assignedImageIndex] && (
+                              <div className="absolute top-2 left-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded backdrop-blur-md">
+                                फ़ोटो #{batchImages[art.assignedImageIndex].fileNumber}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Image Switcher Controls */}
+                          {batchImages.length > 0 ? (
+                            <div className="space-y-2">
+                              <label className="block text-[10px] font-bold text-neutral-500 font-sans">
+                                अपलोड की गई फोटो चुनें:
+                              </label>
+                              <select
+                                value={art.assignedImageIndex >= 0 ? art.assignedImageIndex : ""}
+                                onChange={(e) => handleBatchArticleFieldChange(art.id, "assignedImageIndex", e.target.value)}
+                                className="w-full text-xs font-bold p-2 border border-neutral-300 rounded-lg bg-white focus:border-[#ff6f00] outline-none text-neutral-800"
+                              >
+                                {batchImages.map((img, i) => (
+                                  <option key={img.id} value={i}>
+                                    फ़ोटो #{img.fileNumber}: {img.fileName}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Shift Up/Down Buttons */}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleShiftBatchArticleImage(art.id, "up")}
+                                  className="flex-1 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-extrabold rounded-lg text-[11px] transition-colors cursor-pointer"
+                                >
+                                  ⬆️ पिछली फ़ोटो
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShiftBatchArticleImage(art.id, "down")}
+                                  className="flex-1 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-extrabold rounded-lg text-[11px] transition-colors cursor-pointer"
+                                >
+                                  ⬇️ अगली फ़ोटो
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-neutral-400 font-sans italic">
+                              फ़ोटो का सीधा URL दर्ज करें:
+                            </div>
+                          )}
+
+                          <div className="mt-2">
+                            <input
+                              type="text"
+                              value={art.image}
+                              onChange={(e) => handleBatchArticleFieldChange(art.id, "image", e.target.value)}
+                              placeholder="Image URL..."
+                              className="w-full text-[10px] p-1.5 border border-neutral-300 rounded bg-white text-neutral-600 font-mono truncate"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-2 text-[10px] text-neutral-400 font-sans text-center border-t border-neutral-200">
+                          लेखक: {art.author}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* PUBLISH ALL BATCH ARTICLES BUTTON */}
+              <div className="p-6 bg-gradient-to-r from-neutral-900 to-neutral-950 text-white rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border border-orange-500/30">
+                <div>
+                  <h4 className="text-base font-black text-white">सभी तैयार खबरों को श्रेणीवार प्रकाशित करें</h4>
+                  <p className="text-xs text-neutral-400 font-sans mt-1">
+                    चयनित {batchArticles.filter(a => a.checked).length} समाचारों को अपनी-अपनी सही फोटो और श्रेणी के साथ लाइव किया जाएगा।
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handlePublishBatchArticles}
+                  disabled={publishingBatch || batchArticles.filter(a => a.checked).length === 0}
+                  className="px-8 py-4 bg-[#ff6f00] hover:bg-amber-600 disabled:opacity-50 text-white font-black rounded-xl text-xs tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer shrink-0 select-none"
+                >
+                  {publishingBatch ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>सभी समाचार पब्लिश हो रहे हैं...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>सबमिट करें - सभी खबरें लाइव पब्लिश करें 🚀</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

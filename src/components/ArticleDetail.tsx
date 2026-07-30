@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Heart, MessageSquare, Clock, Send, Share2, Eye, Calendar, ThumbsUp, Check, Type, Bookmark } from "lucide-react";
+import { ArrowLeft, Heart, MessageSquare, Clock, Send, Share2, Eye, Calendar, ThumbsUp, Check, Type, Bookmark, Newspaper, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
-import { Article, Comment } from "../types";
-import { fetchArticleById, likeArticleClient, addCommentClient } from "../lib/newsClient";
+import { Article, Comment, CATEGORIES } from "../types";
+import { fetchArticleById, likeArticleClient, addCommentClient, fetchNewsList } from "../lib/newsClient";
 import AudioNewsReader from "./AudioNewsReader";
 
 interface ArticleDetailProps {
@@ -10,9 +10,18 @@ interface ArticleDetailProps {
   onBack: () => void;
   isBookmarked?: boolean;
   onToggleBookmark?: (e: React.MouseEvent, article: Article) => void;
+  allArticles?: Article[];
+  onArticleSelect?: (article: Article) => void;
 }
 
-export default function ArticleDetail({ articleId, onBack, isBookmarked = false, onToggleBookmark }: ArticleDetailProps) {
+export default function ArticleDetail({ 
+  articleId, 
+  onBack, 
+  isBookmarked = false, 
+  onToggleBookmark,
+  allArticles,
+  onArticleSelect
+}: ArticleDetailProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [likeCount, setLikeCount] = useState(0);
@@ -23,8 +32,10 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
   const [commentSuccess, setCommentSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [fontSize, setFontSize] = useState<"normal" | "large" | "xlarge">("xlarge");
+  const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setLoading(true);
     fetchArticleById(articleId)
       .then((data: Article | null) => {
@@ -40,6 +51,34 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
         setLoading(false);
       });
   }, [articleId]);
+
+  useEffect(() => {
+    if (!article) return;
+
+    const prepareRelated = (sourceArticles: Article[]) => {
+      const pool = sourceArticles.filter((a) => a.id !== article.id);
+      
+      const sameCategory = pool.filter((a) => {
+        if (a.category === article.category) return true;
+        if ((article.category === 'job' || article.category === 'jobs') && (a.category === 'job' || a.category === 'jobs')) return true;
+        if ((article.category === 'astrology' || article.category === 'astro') && (a.category === 'astrology' || a.category === 'astro')) return true;
+        if ((article.category === 'schemes' || article.category === 'scheme' || article.category === 'yojna') && (a.category === 'schemes' || a.category === 'scheme' || a.category === 'yojna')) return true;
+        return false;
+      });
+
+      const otherArticles = pool.filter((a) => !sameCategory.includes(a));
+      const finalRelated = [...sameCategory, ...otherArticles].slice(0, 6);
+      setRelatedArticles(finalRelated);
+    };
+
+    if (allArticles && allArticles.length > 0) {
+      prepareRelated(allArticles);
+    } else {
+      fetchNewsList("all")
+        .then((items) => prepareRelated(items))
+        .catch((err) => console.error("Error fetching related news:", err));
+    }
+  }, [article, articleId, allArticles]);
 
   const handleLike = () => {
     if (hasLiked) return;
@@ -508,6 +547,67 @@ export default function ArticleDetail({ articleId, onBack, isBookmarked = false,
           </div>
         </form>
       </div>
+
+      {/* RELATED NEWS SECTION */}
+      {relatedArticles.length > 0 && (
+        <div className="mt-12 pt-8 border-t-2 border-neutral-200">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+              <span className="w-2.5 h-6 bg-[#ff6f00] rounded-full inline-block"></span>
+              <span>संबंधित समाचार एवं अन्य प्रमुख ख़बरें</span>
+            </h3>
+            <span className="text-xs text-neutral-500 font-bold font-sans bg-neutral-100 px-2.5 py-1 rounded-md">
+              {CATEGORIES.find(c => c.key === article.category)?.hindiName || "खबरें"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {relatedArticles.map((relArt) => (
+              <div
+                key={relArt.id}
+                onClick={() => {
+                  if (onArticleSelect) {
+                    onArticleSelect(relArt);
+                  }
+                }}
+                className="bg-white border border-neutral-200 hover:border-[#ff6f00] rounded-xl overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="relative h-40 overflow-hidden bg-neutral-100">
+                    <img
+                      src={relArt.image}
+                      alt={relArt.title}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-2 left-2 bg-black/75 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                      {CATEGORIES.find(c => c.key === relArt.category)?.hindiName || relArt.category}
+                    </div>
+                  </div>
+                  <div className="p-3.5">
+                    <h4 className="text-sm font-extrabold text-neutral-900 group-hover:text-[#ff6f00] transition-colors line-clamp-2 leading-snug mb-2 font-sans">
+                      {relArt.title}
+                    </h4>
+                    <p className="text-xs text-neutral-500 line-clamp-2 leading-relaxed font-sans mb-3">
+                      {relArt.subtitle || relArt.content.substring(0, 80) + "..."}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="px-3.5 pb-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400 font-sans bg-neutral-50/50">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-[#ff6f00]" />
+                    {relArt.date}
+                  </span>
+                  <span className="text-[#ff6f00] font-bold flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                    पढ़ें <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.article>
   );
 }
