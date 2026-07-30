@@ -160,119 +160,191 @@ export default function ArticleDetail({
 
   const renderFormattedContent = (rawContent: string, catKey: string) => {
     if (!rawContent) return null;
-    const paragraphs = rawContent.split(/\n\n+/);
 
-    return paragraphs.map((para, idx) => {
-      const trimmed = para.trim();
-      if (!trimmed) return null;
+    // Helper to check if a single trimmed line is a section heading
+    const isHeadingLine = (line: string): boolean => {
+      const t = line.trim();
+      if (!t) return false;
+      if (/^[━\-\=\_\*\~\#\s]{3,}$/.test(t)) return false;
 
-      // H2 Heading (## Title)
-      if (trimmed.startsWith("## ")) {
-        const headingText = trimmed.replace(/^##\s+/, "").replace(/\*\*/g, "");
-        return (
-          <div key={idx} className="mt-8 mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`w-3 h-7 rounded-full inline-block shadow-sm ${
-                catKey === "job" ? "bg-gradient-to-b from-blue-600 to-indigo-700" :
-                catKey === "astrology" ? "bg-gradient-to-b from-purple-600 to-fuchsia-700" :
-                catKey === "schemes" ? "bg-gradient-to-b from-emerald-600 to-teal-700" :
-                "bg-gradient-to-b from-orange-600 to-amber-600"
-              }`}></span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                {headingText}
-              </h2>
-            </div>
-            <div className={`w-full h-1 rounded-full ${
-              catKey === "job" ? "bg-gradient-to-r from-blue-600 via-indigo-400 to-transparent" :
-              catKey === "astrology" ? "bg-gradient-to-r from-purple-600 via-pink-400 to-transparent" :
-              catKey === "schemes" ? "bg-gradient-to-r from-emerald-600 via-teal-400 to-transparent" :
-              "bg-gradient-to-r from-orange-600 via-amber-400 to-transparent"
-            }`}></div>
-          </div>
-        );
+      // Markdown / Bold headers
+      if (/^(?:#{1,4}|\*\*)\s*/.test(t)) return true;
+
+      // Explicit label prefixes
+      if (/^(?:हेडिंग|सब\-?हेडिंग|उप\-?शीर्षक|शीर्षक|Heading|Subtitle|Section)[\:\=]?\s*/i.test(t)) return true;
+
+      // Ends with question mark or colon
+      if (t.endsWith("?") || t.endsWith(":") || t.endsWith("؟")) return true;
+
+      // Short line (<= 75 chars) without Hindi full stop (।) or English full stop (.) or !
+      if (t.length <= 75 && !t.includes("।") && !t.includes(".") && !t.includes("!")) {
+        return true;
       }
 
-      // H3 Heading (### Subtitle)
-      if (trimmed.startsWith("### ")) {
-        const headingText = trimmed.replace(/^###\s+/, "").replace(/\*\*/g, "");
-        return (
-          <div key={idx} className={`mt-6 mb-3 p-3.5 rounded-xl border-l-4 shadow-2xs ${
-            catKey === "job" ? "bg-blue-50/80 border-blue-600 text-blue-950" :
-            catKey === "astrology" ? "bg-purple-50/80 border-purple-600 text-purple-950" :
-            catKey === "schemes" ? "bg-emerald-50/80 border-emerald-600 text-emerald-950" :
-            "bg-amber-50/80 border-amber-600 text-amber-950"
-          }`}>
-            <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
-              <span>📌</span>
-              <span>{headingText}</span>
-            </h3>
-          </div>
-        );
+      return false;
+    };
+
+    // Parse raw content into structured blocks
+    const lines = rawContent.split(/\r?\n/);
+    interface ContentBlock {
+      type: "heading" | "paragraph" | "list" | "image";
+      text: string;
+      imgUrl?: string;
+      imgCaption?: string;
+    }
+
+    const blocks: ContentBlock[] = [];
+    let paraBuffer: string[] = [];
+
+    const flushPara = () => {
+      if (paraBuffer.length > 0) {
+        const fullText = paraBuffer.join("\n").trim();
+        if (fullText) {
+          blocks.push({ type: "paragraph", text: fullText });
+        }
+        paraBuffer = [];
+      }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Skip empty or horizontal decorative dividers
+      if (!line || /^[━\-\=\_\*\~\#\s]{3,}$/.test(line)) {
+        flushPara();
+        continue;
       }
 
-      // Inline Image inside article content (Markdown: ![caption](url), [IMAGE: url|caption], <img src="..." />, or raw URL)
-      let parsedImgUrl = "";
-      let parsedImgCaption = "";
+      // Inline Image Check
+      if (
+        (line.includes("![") && line.includes("](") && line.includes(")")) ||
+        line.startsWith("[IMAGE:") || line.startsWith("[IMG:") ||
+        line.startsWith("<img") ||
+        ((line.startsWith("http://") || line.startsWith("https://")) && !line.includes(" ") && (line.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || line.includes("unsplash.com") || line.includes("images")))
+      ) {
+        flushPara();
+        let parsedImgUrl = "";
+        let parsedImgCaption = "";
 
-      if (trimmed.includes("![") && trimmed.includes("](") && trimmed.includes(")")) {
-        const altStart = trimmed.indexOf("![") + 2;
-        const altEnd = trimmed.indexOf("](", altStart);
-        if (altEnd > altStart) {
-          parsedImgCaption = trimmed.substring(altStart, altEnd).trim();
-          const urlStart = altEnd + 2;
-          const urlEnd = trimmed.lastIndexOf(")");
-          if (urlEnd > urlStart) {
-            parsedImgUrl = trimmed.substring(urlStart, urlEnd).trim();
+        if (line.includes("![") && line.includes("](") && line.includes(")")) {
+          const altStart = line.indexOf("![") + 2;
+          const altEnd = line.indexOf("](", altStart);
+          if (altEnd > altStart) {
+            parsedImgCaption = line.substring(altStart, altEnd).trim();
+            const urlStart = altEnd + 2;
+            const urlEnd = line.lastIndexOf(")");
+            if (urlEnd > urlStart) {
+              parsedImgUrl = line.substring(urlStart, urlEnd).trim();
+            }
+          }
+        } else if (line.startsWith("[IMAGE:") || line.startsWith("[IMG:")) {
+          const cleanTag = line.replace(/^\[(IMAGE|IMG):\s*/, "").replace(/\]$/, "").trim();
+          const parts = cleanTag.split("|");
+          parsedImgUrl = parts[0]?.trim() || "";
+          parsedImgCaption = parts[1]?.trim() || "";
+        } else if (line.startsWith("<img")) {
+          const srcMatch = line.match(/src=["'](.*?)["']/);
+          parsedImgUrl = srcMatch ? srcMatch[1] : "";
+          const altMatch = line.match(/alt=["'](.*?)["']/);
+          parsedImgCaption = altMatch ? altMatch[1] : "";
+        } else {
+          parsedImgUrl = line;
+        }
+
+        if (parsedImgUrl) {
+          blocks.push({
+            type: "image",
+            text: line,
+            imgUrl: parsedImgUrl,
+            imgCaption: parsedImgCaption
+          });
+        }
+        continue;
+      }
+
+      // List Check
+      if (line.startsWith("- ") || line.startsWith("* ") || /^\d+[\.\)]\s+/.test(line)) {
+        flushPara();
+        const listLines = [line];
+        while (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (nextLine.startsWith("- ") || nextLine.startsWith("* ") || /^\d+[\.\)]\s+/.test(nextLine)) {
+            listLines.push(nextLine);
+            i++;
+          } else {
+            break;
           }
         }
-      } else if (trimmed.startsWith("[IMAGE:") || trimmed.startsWith("[IMG:")) {
-        const cleanTag = trimmed.replace(/^\[(IMAGE|IMG):\s*/, "").replace(/\]$/, "").trim();
-        const parts = cleanTag.split("|");
-        parsedImgUrl = parts[0]?.trim() || "";
-        parsedImgCaption = parts[1]?.trim() || "";
-      } else if (trimmed.startsWith("<img")) {
-        const srcMatch = trimmed.match(/src=["'](.*?)["']/);
-        parsedImgUrl = srcMatch ? srcMatch[1] : "";
-        const altMatch = trimmed.match(/alt=["'](.*?)["']/);
-        parsedImgCaption = altMatch ? altMatch[1] : "";
-      } else if (
-        (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:image/")) &&
-        !trimmed.includes(" ")
-      ) {
-        parsedImgUrl = trimmed.trim();
+        blocks.push({ type: "list", text: listLines.join("\n") });
+        continue;
       }
 
-      if (parsedImgUrl) {
+      // Heading Check
+      if (isHeadingLine(line)) {
+        flushPara();
+        const cleanHeading = line
+          .replace(/^#{1,4}\s+/, "")
+          .replace(/^(?:हेडिंग|सब\-?हेडिंग|उप\-?शीर्षक|शीर्षक|Heading|Subtitle|Section)[\:\=]?\s*/i, "")
+          .replace(/^\*\*/, "")
+          .replace(/\*\*$/, "")
+          .trim();
+
+        if (cleanHeading) {
+          blocks.push({ type: "heading", text: cleanHeading });
+        }
+        continue;
+      }
+
+      // Paragraph Line
+      paraBuffer.push(line);
+    }
+    flushPara();
+
+    // Render parsed blocks
+    return blocks.map((block, idx) => {
+      if (block.type === "heading") {
+        return (
+          <div key={idx} className="my-8 sm:my-10 text-center">
+            <div className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl border shadow-2xs bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-orange-200/90 max-w-full">
+              <span className="text-orange-600 font-bold text-sm shrink-0">🔸</span>
+              <h2 className="text-base sm:text-lg md:text-xl font-black tracking-tight text-[#d95300] leading-snug">
+                {block.text}
+              </h2>
+            </div>
+          </div>
+        );
+      }
+
+      if (block.type === "image" && block.imgUrl) {
         return (
           <div key={idx} className="my-6 space-y-2 font-sans">
             <div className="overflow-hidden rounded-2xl border border-slate-200/90 shadow-md bg-neutral-900/5 max-w-3xl mx-auto">
               <img
-                src={parsedImgUrl}
-                alt={parsedImgCaption || "समाचार चित्र"}
+                src={block.imgUrl}
+                alt={block.imgCaption || "समाचार चित्र"}
                 className="w-full h-auto max-h-[550px] object-cover hover:scale-101 transition-transform"
                 referrerPolicy="no-referrer"
               />
             </div>
-            {parsedImgCaption && (
+            {block.imgCaption && (
               <p className="text-center text-xs font-semibold text-slate-500 italic">
-                📷 {parsedImgCaption}
+                📷 {block.imgCaption}
               </p>
             )}
           </div>
         );
       }
 
-      // Bullet List or Numbered List
-      if (trimmed.includes("\n- ") || trimmed.includes("\n1. ") || trimmed.startsWith("- ") || trimmed.startsWith("1. ")) {
-        const items = trimmed.split("\n").filter(line => line.trim().length > 0);
+      if (block.type === "list") {
+        const items = block.text.split("\n").filter((l) => l.trim().length > 0);
         return (
-          <div key={idx} className="my-5 bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-2.5">
+          <div key={idx} className="my-6 bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-2.5">
             {items.map((item, itemIdx) => {
-              const cleanItem = item.replace(/^[-*•]|\d+\.\s*/, "").trim();
+              const cleanItem = item.replace(/^[-*•]|\d+[\.\)]\s*/, "").trim();
               const parts = cleanItem.split(/(\*\*.*?\*\*)/g);
               return (
-                <div key={itemIdx} className="flex items-start gap-2.5 text-slate-800 text-sm sm:text-base leading-relaxed font-sans">
-                  <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black shrink-0 mt-0.5 text-white shadow-2xs ${
+                <div key={itemIdx} className="flex items-start gap-2.5 text-slate-900 text-base sm:text-lg leading-relaxed font-sans">
+                  <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-black shrink-0 mt-1 text-white shadow-2xs ${
                     catKey === "job" ? "bg-blue-600" :
                     catKey === "astrology" ? "bg-purple-600" :
                     catKey === "schemes" ? "bg-emerald-600" :
@@ -295,14 +367,14 @@ export default function ArticleDetail({
         );
       }
 
-      // Paragraph with bold text parsing
-      const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+      // Paragraph block with normal black color
+      const paragraphParts = block.text.split(/(\*\*.*?\*\*)/g);
       return (
-        <p key={idx} className="text-slate-800 leading-relaxed font-sans my-4">
-          {parts.map((p, pIdx) => {
+        <p key={idx} className="text-black font-normal text-[17px] sm:text-[18px] md:text-[19px] leading-[1.8] sm:leading-[1.85] font-sans my-5 tracking-normal">
+          {paragraphParts.map((p, pIdx) => {
             if (p.startsWith("**") && p.endsWith("**")) {
               return (
-                <strong key={pIdx} className="font-black text-slate-950 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-200/70 shadow-2xs">
+                <strong key={pIdx} className="font-black text-black bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-200/70 shadow-2xs">
                   {p.slice(2, -2)}
                 </strong>
               );
