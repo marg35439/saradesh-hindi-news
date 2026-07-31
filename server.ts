@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import cors from "cors";
 import { GoogleGenAI, Type } from "@google/genai";
-import { Article } from "./src/types.js";
-import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
+import type { Article } from "./src/types";
+import { FALLBACK_NEWS } from "./src/data/fallbackNews";
 
 // Firebase Imports
 import { initializeApp } from "firebase/app";
@@ -3188,5 +3188,8 @@ async function startServer() {
   }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
 export default app;
