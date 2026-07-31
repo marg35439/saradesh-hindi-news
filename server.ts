@@ -3158,14 +3158,14 @@ app.get("/sitemap-index.xml", (req, res) => {
 });
 
 async function startServer() {
-  // Serve static Vite site in prod, or run dev middleware
+  // Serve static Vite site in prod when running as standalone Node process (not Vercel serverless)
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     // Express v4 handles SPA fallback
@@ -3181,9 +3181,11 @@ async function startServer() {
     console.warn("Non-blocking error checking startup articles:", e);
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Dainik Bhaskar custom server listening on port ${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Dainik Bhaskar custom server listening on port ${PORT}`);
+    });
+  }
 }
 
 startServer();
