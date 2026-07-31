@@ -44,9 +44,6 @@ app.use("/api", (req, res, next) => {
   res.setHeader("Expires", "0");
   next();
 });
-const DATA_DIR = path.join(process.cwd(), "data");
-const NEWS_FILE = path.join(DATA_DIR, "news.json");
-
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -1248,29 +1245,7 @@ app.get("/api/market", async (req, res) => {
   }
 });
 
-// Local Disk Persistence Helpers (Ensures 100% article persistence across sessions & browsers)
-async function loadNewsFromDisk(): Promise<any[]> {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    const content = await fs.readFile(NEWS_FILE, "utf8");
-    const data = JSON.parse(content);
-    if (Array.isArray(data) && data.length > 0) return data;
-  } catch {
-    // File not found or unreadable
-  }
-  return [...DEFAULT_NEWS];
-}
-
-async function saveNewsToDisk(articles: any[]): Promise<void> {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(NEWS_FILE, JSON.stringify(articles, null, 2), "utf8");
-  } catch (err) {
-    console.error("Error saving news to disk:", err);
-  }
-}
-
-// GET all news (Reads live from Firestore Database + Disk File + DEFAULT_NEWS for absolute cross-browser sync)
+// GET all news (Reads live from Firestore Database + in-memory DEFAULT_NEWS for full cross-browser sync)
 app.get("/api/news", async (req, res) => {
   try {
     const deletedSet = new Set<string>();
@@ -1282,12 +1257,6 @@ app.get("/api/news", async (req, res) => {
         const ids = delSnap.data()?.ids;
         if (Array.isArray(ids)) ids.forEach(id => deletedSet.add(id));
       }
-    } catch {}
-
-    try {
-      const delDisk = await fs.readFile(path.join(DATA_DIR, "deleted_news.json"), "utf8");
-      const delArr = JSON.parse(delDisk);
-      if (Array.isArray(delArr)) delArr.forEach((id: string) => deletedSet.add(id));
     } catch {}
 
     const articleMap = new Map<string, any>();
@@ -1302,15 +1271,7 @@ app.get("/api/news", async (req, res) => {
       }
     }
 
-    // 2. Load disk file articles
-    const diskArticles = await loadNewsFromDisk();
-    for (const diskItem of diskArticles) {
-      if (diskItem && diskItem.id && !deletedSet.has(diskItem.id)) {
-        articleMap.set(diskItem.id, { ...articleMap.get(diskItem.id), ...diskItem });
-      }
-    }
-
-    // 3. Load Firestore articles live from server
+    // 2. Load Firestore articles live from server
     try {
       const querySnapshot = await getDocs(collection(db, "articles"));
       if (!querySnapshot.empty) {
@@ -1324,7 +1285,7 @@ app.get("/api/news", async (req, res) => {
         });
       }
     } catch (fsErr) {
-      console.warn("Firestore sync fetch warning (using disk/memory):", fsErr);
+      console.warn("Firestore sync fetch warning (using in-memory fallback):", fsErr);
     }
 
     let articles = Array.from(articleMap.values()).filter(a => !deletedSet.has(a.id));
@@ -1335,9 +1296,6 @@ app.get("/api/news", async (req, res) => {
       const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return timeB - timeA;
     });
-
-    // Save consolidated news to disk asynchronously
-    saveNewsToDisk(articles).catch(() => {});
 
     // Filter by category
     const category = req.query.category;
@@ -1378,7 +1336,18 @@ app.get("/api/news", async (req, res) => {
 app.get("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
   try {
-    // 1. Try Firestore
+    // 1. Check if deleted
+    try {
+      const delSnap = await getDocFromServer(doc(db, "deleted_articles", "index")).catch(() => null);
+      if (delSnap && delSnap.exists()) {
+        const ids = delSnap.data()?.ids;
+        if (Array.isArray(ids) && ids.includes(articleId)) {
+          return res.status(404).json({ error: "आलेख हटा दिया गया है।" });
+        }
+      }
+    } catch {}
+
+    // 2. Try Firestore
     try {
       const docRef = doc(db, "articles", articleId);
       const docSnap = await getDoc(docRef);
@@ -1402,13 +1371,6 @@ app.get("/api/news/:id", async (req, res) => {
       // Ignore Firestore failure
     }
 
-    // 2. Try Disk File
-    const diskArticles = await loadNewsFromDisk();
-    const diskMatch = diskArticles.find(a => a.id === articleId);
-    if (diskMatch) {
-      return res.json(diskMatch);
-    }
-
     // 3. Try DEFAULT_NEWS
     const defItem = DEFAULT_NEWS.find(d => d.id === articleId);
     if (defItem) {
@@ -1418,7 +1380,7 @@ app.get("/api/news/:id", async (req, res) => {
     return res.status(404).json({ error: "आलेख नहीं मिला!" });
   } catch (err: any) {
     console.error("Error fetching article by ID:", err);
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -2610,7 +2572,7 @@ app.post("/api/news/:id/comment", async (req, res) => {
   }
 });
 
-// POST create manual news (Admin Only - but open in this applet)
+// POST create manual news
 app.post("/api/news", async (req, res) => {
   try {
     const { title, subtitle, content, category, state, image, author, tags, metaDescription, isBreaking, isFeatured, isTrending } = req.body;
@@ -2645,12 +2607,7 @@ app.post("/api/news", async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    // 1. Save to disk
-    const diskArticles = await loadNewsFromDisk();
-    diskArticles.unshift(newArticle);
-    await saveNewsToDisk(diskArticles);
-
-    // 2. Save to Firestore
+    // Save to Firestore
     try {
       await setDoc(doc(db, "articles", articleId), newArticle);
     } catch (fsErr) {
@@ -2677,51 +2634,20 @@ app.post("/api/news", async (req, res) => {
   }
 });
 
-// PUT update news (Admin Only)
+// PUT update news
 app.put("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
   try {
     const updatedData = req.body;
+    let mergedArticle: any = { id: articleId, ...updatedData };
 
-    // 1. Update in Disk
-    const diskArticles = await loadNewsFromDisk();
-    const diskIdx = diskArticles.findIndex(a => a.id === articleId);
-    let mergedArticle: any = null;
-
-    if (diskIdx !== -1) {
-      diskArticles[diskIdx] = { ...diskArticles[diskIdx], ...updatedData };
-      mergedArticle = diskArticles[diskIdx];
-    } else {
-      mergedArticle = { id: articleId, ...updatedData };
-      diskArticles.unshift(mergedArticle);
-    }
-    await saveNewsToDisk(diskArticles);
-
-    // 2. Update in Firestore
     try {
       const docRef = doc(db, "articles", articleId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const existingData = docSnap.data();
-        const fieldsToUpdate: any = {
-          title: updatedData.title || existingData.title,
-          subtitle: updatedData.subtitle || existingData.subtitle,
-          content: updatedData.content || existingData.content,
-          category: updatedData.category || existingData.category,
-          state: updatedData.state !== undefined ? (updatedData.state || null) : (existingData.state || null),
-          image: updatedData.image || existingData.image,
-          author: updatedData.author || existingData.author,
-          metaDescription: updatedData.metaDescription !== undefined ? updatedData.metaDescription : existingData.metaDescription,
-          isBreaking: updatedData.isBreaking !== undefined ? !!updatedData.isBreaking : existingData.isBreaking,
-          isFeatured: updatedData.isFeatured !== undefined ? !!updatedData.isFeatured : existingData.isFeatured,
-          isTrending: updatedData.isTrending !== undefined ? !!updatedData.isTrending : existingData.isTrending,
-        };
-        if (updatedData.tags !== undefined) {
-          fieldsToUpdate.tags = typeof updatedData.tags === "string" 
-            ? (updatedData.tags as string).split(",").map(t => t.trim()).filter(Boolean) 
-            : updatedData.tags;
-        }
-        await updateDoc(docRef, fieldsToUpdate);
+        mergedArticle = { ...existingData, ...updatedData, id: articleId };
+        await setDoc(docRef, mergedArticle, { merge: true });
       } else {
         await setDoc(docRef, mergedArticle, { merge: true });
       }
@@ -2735,11 +2661,11 @@ app.put("/api/news/:id", async (req, res) => {
   }
 });
 
-// DELETE news (Admin Only)
+// DELETE news
 app.delete("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
   try {
-    // 1. Record in deleted list on Firestore
+    // Record in deleted list on Firestore
     try {
       await setDoc(doc(db, "deleted_articles", "index"), {
         ids: arrayUnion(articleId)
@@ -2748,27 +2674,6 @@ app.delete("/api/news/:id", async (req, res) => {
     } catch (fsErr) {
       console.warn("Firestore delete record warning:", fsErr);
     }
-
-    // 2. Record in deleted list on Disk
-    try {
-      await fs.mkdir(DATA_DIR, { recursive: true });
-      let delArr: string[] = [];
-      try {
-        const delDisk = await fs.readFile(path.join(DATA_DIR, "deleted_news.json"), "utf8");
-        delArr = JSON.parse(delDisk);
-      } catch {}
-      if (!delArr.includes(articleId)) {
-        delArr.push(articleId);
-        await fs.writeFile(path.join(DATA_DIR, "deleted_news.json"), JSON.stringify(delArr), "utf8");
-      }
-    } catch (e) {
-      console.warn("Disk delete record warning:", e);
-    }
-
-    // 3. Delete from active disk file
-    const diskArticles = await loadNewsFromDisk();
-    const filtered = diskArticles.filter(a => a.id !== articleId);
-    await saveNewsToDisk(filtered);
 
     res.json({ success: true });
   } catch (err: any) {
