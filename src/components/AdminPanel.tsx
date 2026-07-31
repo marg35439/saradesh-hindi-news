@@ -984,7 +984,7 @@ export default function AdminPanel() {
             <span>अखबार एडमिन कंट्रोल विज़ार्ड</span>
           </div>
           <p className='text-xs text-neutral-400 mt-1 font-sans'>
-            आज दिनांक 21 मई 2026: समाचारों का सम्पादन, एआई सामग्री संकलन एवं विश्लेषिकी पैनल
+            आज दिनांक {new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' })}: समाचारों का सम्पादन, एआई सामग्री संकलन एवं विश्लेषिकी पैनल
           </p>
         </div>
 

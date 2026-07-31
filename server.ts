@@ -1191,38 +1191,30 @@ app.get("/api/news", async (req, res) => {
   try {
     const querySnapshot = await getDocs(collection(db, "articles"));
     let articles: any[] = [];
-    querySnapshot.forEach((doc) => {
-      articles.push({ id: doc.id, ...doc.data() });
-    });
+
+    if (querySnapshot.empty) {
+      // Seed DEFAULT_NEWS if database is completely empty
+      for (const defItem of DEFAULT_NEWS) {
+        const docRef = doc(db, "articles", defItem.id);
+        const itemToSave = {
+          ...defItem,
+          createdAt: defItem.createdAt || new Date().toISOString()
+        };
+        await setDoc(docRef, itemToSave, { merge: true }).catch(() => {});
+        articles.push(itemToSave);
+      }
+    } else {
+      querySnapshot.forEach((docSnap) => {
+        articles.push({ id: docSnap.id, ...docSnap.data() });
+      });
+    }
 
     // Sort by createdAt descending
     articles.sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
     });
-
-    // Force sync and update canonical articles in Firestore with clean, verified news
-    const canonicalIds = new Set(DEFAULT_NEWS.map(item => item.id));
-
-    // Delete outdated news articles from Firestore
-    for (const docSnap of querySnapshot.docs) {
-      if (!canonicalIds.has(docSnap.id) && docSnap.id.startsWith("news-")) {
-        await deleteDoc(doc(db, "articles", docSnap.id)).catch(() => {});
-      }
-    }
-
-    // Force update canonical items in Firestore
-    articles = [];
-    for (const defItem of DEFAULT_NEWS) {
-      const docRef = doc(db, "articles", defItem.id);
-      const updatedItem = {
-        ...defItem,
-        createdAt: defItem.createdAt || new Date().toISOString()
-      };
-      await setDoc(docRef, updatedItem, { merge: true }).catch(() => {});
-      articles.push(updatedItem);
-    }
 
     // Filter by category if query exists
     const category = req.query.category;

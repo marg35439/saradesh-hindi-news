@@ -19,6 +19,10 @@ export async function fetchNewsList(
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
+        // Keep local storage in sync when fetching all news
+        if (category === "all" && (!state || state === "सभी राज्य") && !searchQuery) {
+          saveLocalArticles(data);
+        }
         return data;
       }
     }
@@ -136,19 +140,35 @@ export async function addCommentClient(
 }
 
 export async function saveArticleClient(articleData: Partial<Article>): Promise<Article> {
+  const isEdit = !!articleData.id;
+  const url = isEdit ? `/api/news/${articleData.id}` : "/api/news";
+  const method = isEdit ? "PUT" : "POST";
+
   try {
-    const res = await fetch("/api/news", {
-      method: "POST",
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(articleData)
     });
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      const saved: Article = data.article || data;
+      
+      const items = getLocalArticles();
+      const idx = items.findIndex((a) => a.id === saved.id);
+      if (idx !== -1) {
+        items[idx] = saved;
+      } else {
+        items.unshift(saved);
+      }
+      saveLocalArticles(items);
+      return saved;
     }
   } catch (err) {
     console.warn("API save article failed, updating local storage:", err);
   }
 
+  // Fallback to local storage if server request fails
   const items = getLocalArticles();
   let articleToReturn: Article;
 
@@ -172,7 +192,7 @@ export async function saveArticleClient(articleData: Partial<Article>): Promise<
       category: articleData.category || "national",
       image: articleData.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=800",
       author: articleData.author || "विशेष संपादक",
-      date: articleData.date || new Date().toLocaleDateString("hi-IN"),
+      date: articleData.date || new Date().toLocaleDateString("hi-IN", { year: 'numeric', month: 'long', day: 'numeric' }),
       readTime: articleData.readTime || 3,
       views: 1,
       likes: 0,
@@ -193,6 +213,9 @@ export async function deleteArticleClient(id: string): Promise<boolean> {
   try {
     const res = await fetch(`/api/news/${id}`, { method: "DELETE" });
     if (res.ok) {
+      const items = getLocalArticles();
+      const filtered = items.filter((a) => a.id !== id);
+      saveLocalArticles(filtered);
       return true;
     }
   } catch (err) {
