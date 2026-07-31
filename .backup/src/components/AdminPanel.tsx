@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon, UserCheck } from "lucide-react";
+import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { Article, CATEGORIES, STATES } from "../types";
 import { fetchNewsList, saveArticleClient, deleteArticleClient } from "../lib/newsClient";
-import { auth } from "../lib/firebase";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  User
-} from "firebase/auth";
 
 // Helper function to compress images before storing to keep database and UI light & fast
 const compressImageFile = (file: File, maxWidth = 1000, quality = 0.75): Promise<string> => {
@@ -246,42 +238,16 @@ const parseBatchNewsText = (text: string) => {
 };
 
 export default function AdminPanel() {
-  // Firebase Authentication states
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [emailInput, setEmailInput] = useState("");
+  // Authentication states
   const [passwordInput, setPasswordInput] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem("bhaskar_admin_auth") === "true";
+  });
   const [authError, setAuthError] = useState("");
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch">("list");
-
-  const isAuthenticated = !!currentUser;
-
-  const loadArticles = () => {
-    setLoading(true);
-    fetchNewsList()
-      .then((data) => {
-        setArticles(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      if (user) {
-        loadArticles();
-      }
-    });
-    return () => unsubscribe();
-  }, []);
   
   // Bulk Batch Importer & Photo Matcher States
   const [batchNewsText, setBatchNewsText] = useState("");
@@ -354,6 +320,25 @@ export default function AdminPanel() {
     "बस कुछ ही पल... आपका प्रीमियम लेख लगभग तैयार है!"
   ];
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadArticles();
+    }
+  }, [isAuthenticated]);
+
+  const loadArticles = () => {
+    setLoading(true);
+    fetchNewsList()
+      .then((data) => {
+        setArticles(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
+  };
+
   const handleScrapeUrl = async () => {
     if (!urlInput.trim()) return;
     setScrapingUrl(true);
@@ -392,20 +377,26 @@ export default function AdminPanel() {
     try {
       let successCount = 0;
       for (const art of selectedArticles) {
-        await saveArticleClient({
-          title: art.title,
-          subtitle: art.subtitle,
-          content: art.content,
-          category: art.category,
-          state: art.state || undefined,
-          image: art.image,
-          author: art.author || "सारादेश.in संपादक",
-          tags: art.tags,
-          isBreaking: false,
-          isFeatured: false,
-          isTrending: true
+        const res = await fetch("/api/news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: art.title,
+            subtitle: art.subtitle,
+            content: art.content,
+            category: art.category,
+            state: art.state || undefined,
+            image: art.image,
+            author: art.author,
+            tags: art.tags,
+            isBreaking: false,
+            isFeatured: false,
+            isTrending: true
+          })
         });
-        successCount++;
+        if (res.ok) {
+          successCount++;
+        }
       }
       alert(`सफलतापूर्वक ${successCount} नई खबरें वेबसाइट पर सही केटेगरी के अंतर्गत लाइव पब्लिश कर दी गई हैं!`);
       setScrapedUrlArticles([]);
@@ -512,20 +503,26 @@ export default function AdminPanel() {
     try {
       let successCount = 0;
       for (const art of selectedArticles) {
-        await saveArticleClient({
-          title: art.title,
-          subtitle: art.subtitle,
-          content: art.content,
-          category: art.category,
-          state: art.state || undefined,
-          image: art.image,
-          author: art.author || "सारादेश.in एआई टीम",
-          tags: art.tags,
-          isBreaking: false,
-          isFeatured: false,
-          isTrending: true
+        const res = await fetch("/api/news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: art.title,
+            subtitle: art.subtitle,
+            content: art.content,
+            category: art.category,
+            state: art.state || undefined,
+            image: art.image,
+            author: art.author,
+            tags: art.tags,
+            isBreaking: false,
+            isFeatured: false,
+            isTrending: true
+          })
         });
-        successCount++;
+        if (res.ok) {
+          successCount++;
+        }
       }
       alert(`सफलतापूर्वक ${successCount} नई खबरें साइट पर सही तरीके से कैटोगरी वाइज पब्लिश कर दी गई हैं!`);
       setScreenshotArticles([]);
@@ -571,20 +568,26 @@ export default function AdminPanel() {
     try {
       let successCount = 0;
       for (const art of compiledArticles) {
-        await saveArticleClient({
-          title: art.title,
-          subtitle: art.subtitle,
-          content: art.content,
-          category: art.category,
-          state: art.state || undefined,
-          image: art.image,
-          author: art.author || "सारादेश.in लेखक",
-          tags: art.tags,
-          isBreaking: false,
-          isFeatured: false,
-          isTrending: true
+        const res = await fetch("/api/news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: art.title,
+            subtitle: art.subtitle,
+            content: art.content,
+            category: art.category,
+            state: art.state || undefined,
+            image: art.image,
+            author: art.author,
+            tags: art.tags,
+            isBreaking: false,
+            isFeatured: false,
+            isTrending: true
+          })
         });
-        successCount++;
+        if (res.ok) {
+          successCount++;
+        }
       }
       alert(`सफलतापूर्वक ${successCount} नई खबरें साइट पर पब्लिश कर दी गई हैं!`);
       setCompiledArticles([]);
@@ -717,21 +720,27 @@ export default function AdminPanel() {
           ? art.tags 
           : (typeof art.tags === "string" ? art.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : ["मुख्य समाचार"]);
 
-        await saveArticleClient({
-          title: art.title,
-          subtitle: art.subtitle,
-          content: art.content,
-          category: art.category,
-          state: art.state || undefined,
-          image: art.image,
-          author: art.author || "सारादेश.in संपादक",
-          tags: tagList,
-          metaDescription: art.metaDescription || undefined,
-          isBreaking: false,
-          isFeatured: false,
-          isTrending: true
+        const res = await fetch("/api/news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: art.title,
+            subtitle: art.subtitle,
+            content: art.content,
+            category: art.category,
+            state: art.state || undefined,
+            image: art.image,
+            author: art.author,
+            tags: tagList,
+            metaDescription: art.metaDescription || undefined,
+            isBreaking: false,
+            isFeatured: false,
+            isTrending: true
+          })
         });
-        successCount++;
+        if (res.ok) {
+          successCount++;
+        }
       }
       alert(`सफलतापूर्वक ${successCount} नई खबरें सही-सही फोटो एवं श्रेणी के साथ लाइव पब्लिश कर दी गई हैं!`);
       setBatchArticles([]);
@@ -747,45 +756,23 @@ export default function AdminPanel() {
     }
   };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim() || !passwordInput.trim()) {
-      setAuthError("कृपया ईमेल और पासवर्ड दोनों दर्ज करें।");
-      return;
-    }
-    setAuthError("");
-    setAuthLoading(true);
-    try {
-      if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput.trim());
-      } else {
-        await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput.trim());
-      }
-    } catch (err: any) {
-      console.error("Firebase Auth error:", err);
-      let msg = err.message || "प्रमाणीकरण विफल।";
-      if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-        msg = "गलत ईमेल या पासवर्ड! यदि आपका खाता नहीं बना है तो 'नया एडमिन खाता बनाएं' विकल्प चुनें।";
-      } else if (err.code === "auth/email-already-in-use") {
-        msg = "यह ईमेल पहले से पंजीकृत है। कृपया लॉगिन करें।";
-      } else if (err.code === "auth/weak-password") {
-        msg = "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
-      }
-      setAuthError(msg);
-    } finally {
-      setAuthLoading(false);
+    const cleanPass = passwordInput.trim();
+    if (cleanPass === "admin" || cleanPass === "bhaskar123") {
+      localStorage.setItem("bhaskar_admin_auth", "true");
+      setIsAuthenticated(true);
+      setAuthError("");
+    } else {
+      setAuthError("गलत पासवर्ड! कृपया सही एडमिन क्रैडेंशियल दर्ज करें।");
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setEmailInput("");
-      setPasswordInput("");
-      setAuthError("");
-    } catch (err: any) {
-      console.error("Logout error:", err);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem("bhaskar_admin_auth");
+    setIsAuthenticated(false);
+    setPasswordInput("");
+    setAuthError("");
   };
 
   const handleGenerateAI = async () => {
@@ -943,39 +930,27 @@ export default function AdminPanel() {
             <div className="w-16 h-16 bg-[#ff6f00]/10 text-[#ff6f00] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#ff6f00]/20">
               <Lock className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-black text-neutral-900 tracking-tight">एडमिन सुरक्षा प्रमाणीकरण (Firebase Auth)</h2>
+            <h2 className="text-xl font-black text-neutral-900 tracking-tight">एडमिन सुरक्षा प्रमाणीकरण</h2>
             <p className="text-xs text-neutral-500 mt-2 font-sans">
-              यह विभाग केवल अधिकृत संपादकों और एडमिन के लिए है। आगे बढ़ने के लिए कृपया अपना एडमिन ईमेल और पासवर्ड दर्ज करें।
+              यह विभाग केवल अधिकृत संपादकों और एडमिन के लिए है। आगे बढ़ने के लिए कृपया एडमिन पासवर्ड दर्ज करें।
             </p>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1.5 font-sans">एडमिन ईमेल (Admin Email):</label>
-              <input
-                type="email"
-                required
-                placeholder="admin@saradesh.in"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="w-full text-sm p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-sans"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 mb-1.5 font-sans">सुरक्षा पासवर्ड (Password):</label>
+              <label className="block text-xs font-bold text-neutral-700 mb-1.5 font-sans">एडमिन पासवर्ड (Security Code):</label>
               <input
                 type="password"
                 required
-                placeholder="••••••••"
+                placeholder="पासवर्ड दर्ज करें..."
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full text-sm p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-sans"
+                className="w-full text-sm p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none tracking-widest text-center font-mono"
               />
             </div>
 
             {authError && (
-              <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg flex items-center gap-2 font-sans">
+              <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg flex items-center gap-2 font-sans animate-bounce">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{authError}</span>
               </div>
@@ -983,34 +958,16 @@ export default function AdminPanel() {
 
             <button
               type="submit"
-              disabled={authLoading}
-              className="w-full py-3 bg-[#ff6f00] hover:bg-amber-600 text-white font-extrabold rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-600/15 font-sans disabled:opacity-50"
+              className="w-full py-3 bg-[#ff6f00] hover:bg-amber-600 text-white font-extrabold rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-600/15 font-sans"
             >
-              {authLoading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Unlock className="w-4 h-4" />
-              )}
-              <span>{isRegistering ? "नया एडमिन खाता बनाएं (Register)" : "कंट्रोल पैनल खोलें (Firebase Sign In)"}</span>
+              <Unlock className="w-4 h-4" />
+              <span>कंट्रोल पैनल खोलें (Unlock Panel)</span>
             </button>
-
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setAuthError("");
-                }}
-                className="text-xs font-bold text-neutral-500 hover:text-[#ff6f00] underline font-sans cursor-pointer"
-              >
-                {isRegistering ? "पहले से पंजीकृत हैं? लॉगिन करें" : "नया एडमिन खाता बनाना चाहते हैं? (Create Admin)"}
-              </button>
-            </div>
           </form>
 
           <div className="mt-6 pt-5 border-t border-neutral-100 text-center">
             <div className="inline-block px-3 py-1.5 rounded-lg bg-neutral-50 border text-[10px] text-neutral-400 font-sans font-medium">
-              🔒 सुरक्षित Firebase Authentication सक्रिय है • सारादेश समाचार कंट्रोल विभाग
+              🔒 सुरक्षित कूटलेखन एन्क्रिप्शन सक्रिय है • सारादेश समाचार कंट्रोल विभाग
             </div>
           </div>
         </motion.div>

@@ -2,14 +2,27 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Anyone can read articles and comments.
-    // Writes are done via backend server (which runs server-side).
-    // Let's allow read and write directly to support local connections.
+    
+    // Articles collection
     match /articles/{articleId} {
-      allow read, write: if true;
+      // Anyone can read news articles
+      allow read: if true;
+      
+      // Only authenticated admins can create or delete articles
+      allow create, delete: if request.auth != null;
+      
+      // Updates allowed for authenticated admins, OR for public readers adding likes/comments/views
+      allow update: if request.auth != null 
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'comments', 'views']);
+    }
+
+    // Deleted articles index
+    match /deleted_articles/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    // Default fallback rule for any other collection
+    // Default deny for all other collections
     match /{document=**} {
       allow read, write: if false;
     }
