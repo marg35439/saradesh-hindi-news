@@ -1,5 +1,5 @@
 import { Article, CategoryKey, Comment } from "../types";
-import { FALLBACK_NEWS, getLocalArticles, saveLocalArticles } from "../data/fallbackNews";
+import { FALLBACK_NEWS } from "../data/fallbackNews";
 
 export async function fetchNewsList(
   category: CategoryKey = "all",
@@ -20,29 +20,16 @@ export async function fetchNewsList(
     });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        // Keep local storage in sync when fetching news
-        if (!searchQuery) {
-          if (category === "all" && (!state || state === "सभी राज्य")) {
-            saveLocalArticles(data);
-          } else {
-            // Merge with existing local articles
-            const current = getLocalArticles();
-            const map = new Map<string, Article>();
-            current.forEach(item => map.set(item.id, item));
-            data.forEach((item: Article) => map.set(item.id, item));
-            saveLocalArticles(Array.from(map.values()));
-          }
-        }
+      if (Array.isArray(data)) {
         return data;
       }
     }
   } catch (err) {
-    console.warn("API news fetch failed, using client-side fallback:", err);
+    console.error("API news fetch failed:", err);
   }
 
-  // Fallback to local storage or fallback dataset
-  let items = getLocalArticles();
+  // Static fallback dataset for initial page load if backend unreachable
+  let items = [...FALLBACK_NEWS];
 
   // Category filter
   if (category && category !== "all") {
@@ -87,33 +74,19 @@ export async function fetchArticleById(id: string): Promise<Article | null> {
       return await res.json();
     }
   } catch (err) {
-    console.warn("API article fetch failed, using client-side fallback:", err);
+    console.error("API article fetch failed:", err);
   }
 
-  const items = getLocalArticles();
-  const found = items.find((a) => a.id === id);
+  const found = FALLBACK_NEWS.find((a) => a.id === id);
   return found || null;
 }
 
 export async function likeArticleClient(id: string): Promise<{ likes: number }> {
-  try {
-    const res = await fetch(`/api/news/${id}/like`, { method: "POST" });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.warn("API like failed, updating local storage:", err);
+  const res = await fetch(`/api/news/${id}/like`, { method: "POST" });
+  if (res.ok) {
+    return await res.json();
   }
-
-  const items = getLocalArticles();
-  const index = items.findIndex((a) => a.id === id);
-  let newLikes = 1;
-  if (index !== -1) {
-    items[index].likes = (items[index].likes || 0) + 1;
-    newLikes = items[index].likes;
-    saveLocalArticles(items);
-  }
-  return { likes: newLikes };
+  throw new Error("पसंद (Like) अपडेट करने में विफलता।");
 }
 
 export async function addCommentClient(
@@ -121,35 +94,16 @@ export async function addCommentClient(
   name: string,
   text: string
 ): Promise<{ comments: Comment[] }> {
-  try {
-    const res = await fetch(`/api/news/${id}/comment`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, text })
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.warn("API comment failed, updating local storage:", err);
+  const res = await fetch(`/api/news/${id}/comment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, text })
+  });
+  if (res.ok) {
+    return await res.json();
   }
-
-  const items = getLocalArticles();
-  const index = items.findIndex((a) => a.id === id);
-  const newComment: Comment = {
-    id: "comment-" + Date.now(),
-    name: name || "पाठक",
-    text,
-    date: "अभी"
-  };
-
-  let updatedComments: Comment[] = [newComment];
-  if (index !== -1) {
-    updatedComments = [newComment, ...(items[index].comments || [])];
-    items[index].comments = updatedComments;
-    saveLocalArticles(items);
-  }
-  return { comments: updatedComments };
+  const errData = await res.json().catch(() => ({}));
+  throw new Error(errData.error || "टिप्पणी जोड़ने में विफलता।");
 }
 
 export async function saveArticleClient(articleData: Partial<Article>): Promise<Article> {
@@ -157,86 +111,38 @@ export async function saveArticleClient(articleData: Partial<Article>): Promise<
   const url = isEdit ? `/api/news/${articleData.id}` : "/api/news";
   const method = isEdit ? "PUT" : "POST";
 
+  let res: Response;
   try {
-    const res = await fetch(url, {
+    res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(articleData)
     });
-    if (res.ok) {
-      const data = await res.json();
-      const saved: Article = data.article || data;
-      
-      const items = getLocalArticles();
-      const idx = items.findIndex((a) => a.id === saved.id);
-      if (idx !== -1) {
-        items[idx] = saved;
-      } else {
-        items.unshift(saved);
-      }
-      saveLocalArticles(items);
-      return saved;
-    }
-  } catch (err) {
-    console.warn("API save article failed, updating local storage:", err);
+  } catch (netErr: any) {
+    throw new Error("सर्वर से संपर्क नहीं हो सका। कृपया अपना इंटरनेट कनेक्शन जांचें: " + (netErr?.message || "नेटवर्क त्रुटि"));
   }
 
-  // Fallback to local storage if server request fails
-  const items = getLocalArticles();
-  let articleToReturn: Article;
-
-  if (articleData.id) {
-    // Edit existing
-    const idx = items.findIndex((a) => a.id === articleData.id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...articleData };
-      articleToReturn = items[idx];
-    } else {
-      articleToReturn = articleData as Article;
-      items.unshift(articleToReturn);
-    }
+  if (res.ok) {
+    const data = await res.json();
+    return data.article || data;
   } else {
-    // Create new
-    articleToReturn = {
-      id: "news-" + Date.now(),
-      title: articleData.title || "बिना शीर्षक",
-      subtitle: articleData.subtitle || "",
-      content: articleData.content || "",
-      category: articleData.category || "national",
-      image: articleData.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=800",
-      author: articleData.author || "विशेष संपादक",
-      date: articleData.date || new Date().toLocaleDateString("hi-IN", { year: 'numeric', month: 'long', day: 'numeric' }),
-      readTime: articleData.readTime || 3,
-      views: 1,
-      likes: 0,
-      comments: [],
-      tags: articleData.tags || ["समाचार"],
-      isBreaking: !!articleData.isBreaking,
-      isFeatured: !!articleData.isFeatured,
-      isTrending: !!articleData.isTrending
-    };
-    items.unshift(articleToReturn);
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "सर्वर/डेटाबेस (Firestore) पर खबर सहेजने में विफल।");
   }
-
-  saveLocalArticles(items);
-  return articleToReturn;
 }
 
 export async function deleteArticleClient(id: string): Promise<boolean> {
+  let res: Response;
   try {
-    const res = await fetch(`/api/news/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      const items = getLocalArticles();
-      const filtered = items.filter((a) => a.id !== id);
-      saveLocalArticles(filtered);
-      return true;
-    }
-  } catch (err) {
-    console.warn("API delete article failed, updating local storage:", err);
+    res = await fetch(`/api/news/${id}`, { method: "DELETE" });
+  } catch (netErr: any) {
+    throw new Error("सर्वर से संपर्क नहीं हो सका: " + (netErr?.message || "नेटवर्क त्रुटि"));
   }
 
-  const items = getLocalArticles();
-  const filtered = items.filter((a) => a.id !== id);
-  saveLocalArticles(filtered);
-  return true;
+  if (res.ok) {
+    return true;
+  } else {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || "सर्वर/डेटाबेस (Firestore) से खबर हटाने में विफल।");
+  }
 }

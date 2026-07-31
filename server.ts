@@ -51,10 +51,40 @@ const NEWS_FILE = path.join(DATA_DIR, "news.json");
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Load Firebase configuration from firebase-applet-config.json using synchronous read to prevent CJS Top-level await compile error
-const firebaseConfig = JSON.parse(
-  fsDirect.readFileSync(path.join(process.cwd(), "firebase-applet-config.json"), "utf8")
-);
+// Default public Web Firebase configuration (Public client config, no private keys or service account credentials)
+const DEFAULT_FIREBASE_CONFIG = {
+  projectId: "gen-lang-client-0721934091",
+  appId: "1:261949691701:web:a7880593357631591e5e7c",
+  apiKey: "AIzaSyBfeCKrGN2lZjsnJ0oyP1rGMKDfOIsr5WU",
+  authDomain: "gen-lang-client-0721934091.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-f2dd68f4-b9db-436d-ad6f-46b6409a1aa6",
+  storageBucket: "gen-lang-client-0721934091.firebasestorage.app",
+  messagingSenderId: "261949691701",
+  measurementId: ""
+};
+
+let firebaseConfig = { ...DEFAULT_FIREBASE_CONFIG };
+
+// 1. Try reading firebase-applet-config.json if present
+try {
+  const configFile = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fsDirect.existsSync(configFile)) {
+    const fileContent = fsDirect.readFileSync(configFile, "utf8");
+    const parsed = JSON.parse(fileContent);
+    firebaseConfig = { ...firebaseConfig, ...parsed };
+  }
+} catch (e) {
+  console.warn("Notice: firebase-applet-config.json not readable, using default production web config:", e);
+}
+
+// 2. Allow environment variable overrides if provided
+if (process.env.FIREBASE_PROJECT_ID) firebaseConfig.projectId = process.env.FIREBASE_PROJECT_ID;
+if (process.env.FIREBASE_API_KEY) firebaseConfig.apiKey = process.env.FIREBASE_API_KEY;
+if (process.env.FIREBASE_APP_ID) firebaseConfig.appId = process.env.FIREBASE_APP_ID;
+if (process.env.FIREBASE_AUTH_DOMAIN) firebaseConfig.authDomain = process.env.FIREBASE_AUTH_DOMAIN;
+if (process.env.FIREBASE_FIRESTORE_DATABASE_ID) firebaseConfig.firestoreDatabaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID;
+if (process.env.FIREBASE_STORAGE_BUCKET) firebaseConfig.storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+if (process.env.FIREBASE_MESSAGING_SENDER_ID) firebaseConfig.messagingSenderId = process.env.FIREBASE_MESSAGING_SENDER_ID;
 
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
