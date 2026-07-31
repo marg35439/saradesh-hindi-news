@@ -5,6 +5,7 @@ import fsDirect from "fs";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import cors from "cors";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Article } from "./src/types.js";
 import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
@@ -29,6 +30,21 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Enable CORS for all origins and domains
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "X-Requested-With"]
+}));
+
+// Disable HTTP caching on API endpoints so browsers always receive live updates
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
 const DATA_DIR = path.join(process.cwd(), "data");
 const NEWS_FILE = path.join(DATA_DIR, "news.json");
 
@@ -1101,7 +1117,10 @@ app.get("/api/market", async (req, res) => {
           const apiRes = await fetch(
             `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d`,
             { 
-              headers: { "User-Agent": "Mozilla/5.0" },
+              headers: { 
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*"
+              },
               signal: AbortSignal.timeout(4000) 
             }
           );
@@ -1185,29 +1204,71 @@ app.get("/api/market", async (req, res) => {
   }
 });
 
-// GET all news from Firestore (Seeds DEFAULT_NEWS if database is empty)
+// Local Disk Persistence Helpers (Ensures 100% article persistence across sessions & browsers)
+async function loadNewsFromDisk(): Promise<any[]> {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const content = await fs.readFile(NEWS_FILE, "utf8");
+    const data = JSON.parse(content);
+    if (Array.isArray(data) && data.length > 0) return data;
+  } catch {
+    // File not found or unreadable
+  }
+  return [...DEFAULT_NEWS];
+}
 
+async function saveNewsToDisk(articles: any[]): Promise<void> {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.writeFile(NEWS_FILE, JSON.stringify(articles, null, 2), "utf8");
+  } catch (err) {
+    console.error("Error saving news to disk:", err);
+  }
+}
+
+// GET all news (Merges Firestore Database + Disk File + DEFAULT_NEWS for absolute synchronization)
 app.get("/api/news", async (req, res) => {
   try {
-    const querySnapshot = await getDocs(collection(db, "articles"));
-    let articles: any[] = [];
+    const articleMap = new Map<string, any>();
 
-    if (querySnapshot.empty) {
-      // Seed DEFAULT_NEWS if database is completely empty
-      for (const defItem of DEFAULT_NEWS) {
-        const docRef = doc(db, "articles", defItem.id);
-        const itemToSave = {
-          ...defItem,
-          createdAt: defItem.createdAt || new Date().toISOString()
-        };
-        await setDoc(docRef, itemToSave, { merge: true }).catch(() => {});
-        articles.push(itemToSave);
-      }
-    } else {
-      querySnapshot.forEach((docSnap) => {
-        articles.push({ id: docSnap.id, ...docSnap.data() });
+    // 1. Load DEFAULT_NEWS as base
+    for (const defItem of DEFAULT_NEWS) {
+      articleMap.set(defItem.id, {
+        ...defItem,
+        createdAt: defItem.createdAt || new Date().toISOString()
       });
     }
+
+    // 2. Load disk file articles
+    const diskArticles = await loadNewsFromDisk();
+    for (const diskItem of diskArticles) {
+      if (diskItem && diskItem.id) {
+        articleMap.set(diskItem.id, { ...articleMap.get(diskItem.id), ...diskItem });
+      }
+    }
+
+    // 3. Load Firestore articles
+    try {
+      const querySnapshot = await getDocs(collection(db, "articles"));
+      if (!querySnapshot.empty) {
+        querySnapshot.forEach((docSnap) => {
+          const fsData = docSnap.data();
+          if (fsData) {
+            articleMap.set(docSnap.id, { id: docSnap.id, ...articleMap.get(docSnap.id), ...fsData });
+          }
+        });
+      } else {
+        // Seed Firestore if completely empty
+        for (const defItem of DEFAULT_NEWS) {
+          const docRef = doc(db, "articles", defItem.id);
+          await setDoc(docRef, defItem, { merge: true }).catch(() => {});
+        }
+      }
+    } catch (fsErr) {
+      console.warn("Firestore sync fetch warning (using disk/memory):", fsErr);
+    }
+
+    let articles = Array.from(articleMap.values());
 
     // Sort by createdAt descending
     articles.sort((a, b) => {
@@ -1216,7 +1277,10 @@ app.get("/api/news", async (req, res) => {
       return timeB - timeA;
     });
 
-    // Filter by category if query exists
+    // Save consolidated news to disk asynchronously
+    saveNewsToDisk(articles).catch(() => {});
+
+    // Filter by category
     const category = req.query.category;
     if (category && category !== "all") {
       articles = articles.filter((a: any) => a.category === category);
@@ -1254,32 +1318,45 @@ app.get("/api/news", async (req, res) => {
 // GET news by ID
 app.get("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
-  const docRef = doc(db, "articles", articleId);
   try {
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      // Fallback check in DEFAULT_NEWS
-      const defItem = DEFAULT_NEWS.find(d => d.id === articleId);
-      if (defItem) {
-        return res.json(defItem);
+    // 1. Try Firestore
+    try {
+      const docRef = doc(db, "articles", articleId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const defMatch = DEFAULT_NEWS.find(d => d.id === articleId);
+        if (defMatch && (!data.content || data.content.length < 350 || !data.content.includes("##"))) {
+          return res.json({
+            id: docSnap.id,
+            ...data,
+            title: defMatch.title,
+            subtitle: defMatch.subtitle,
+            content: defMatch.content,
+            author: defMatch.author,
+            tags: defMatch.tags
+          });
+        }
+        return res.json({ id: docSnap.id, ...data });
       }
-      return res.status(404).json({ error: "आलेख नहीं मिला!" });
+    } catch {
+      // Ignore Firestore failure
     }
-    const data = docSnap.data();
-    const defMatch = DEFAULT_NEWS.find(d => d.id === articleId);
-    if (defMatch && (!data.content || data.content.length < 350 || !data.content.includes("##"))) {
-      const enriched = {
-        id: docSnap.id,
-        ...data,
-        title: defMatch.title,
-        subtitle: defMatch.subtitle,
-        content: defMatch.content,
-        author: defMatch.author,
-        tags: defMatch.tags
-      };
-      return res.json(enriched);
+
+    // 2. Try Disk File
+    const diskArticles = await loadNewsFromDisk();
+    const diskMatch = diskArticles.find(a => a.id === articleId);
+    if (diskMatch) {
+      return res.json(diskMatch);
     }
-    return res.json({ id: docSnap.id, ...data });
+
+    // 3. Try DEFAULT_NEWS
+    const defItem = DEFAULT_NEWS.find(d => d.id === articleId);
+    if (defItem) {
+      return res.json(defItem);
+    }
+
+    return res.status(404).json({ error: "आलेख नहीं मिला!" });
   } catch (err: any) {
     console.error("Error fetching article by ID:", err);
     return res.status(500).json({ error: err.message });
@@ -2509,7 +2586,17 @@ app.post("/api/news", async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    await setDoc(doc(db, "articles", articleId), newArticle);
+    // 1. Save to disk
+    const diskArticles = await loadNewsFromDisk();
+    diskArticles.unshift(newArticle);
+    await saveNewsToDisk(diskArticles);
+
+    // 2. Save to Firestore
+    try {
+      await setDoc(doc(db, "articles", articleId), newArticle);
+    } catch (fsErr) {
+      console.warn("Firestore save warning:", fsErr);
+    }
     
     // Maintain single featured article constraint
     if (isFeatured) {
@@ -2527,7 +2614,6 @@ app.post("/api/news", async (req, res) => {
     
     res.json({ success: true, article: newArticle });
   } catch (err: any) {
-    handleFirestoreError(err, OperationType.CREATE, "articles");
     res.status(500).json({ error: err.message });
   }
 });
@@ -2535,56 +2621,57 @@ app.post("/api/news", async (req, res) => {
 // PUT update news (Admin Only)
 app.put("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
-  const docRef = doc(db, "articles", articleId);
   try {
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      return res.status(404).json({ error: "आलेख नहीं मिला" });
-    }
-    
     const updatedData = req.body;
-    const existingData = docSnap.data();
-    
-    const fieldsToUpdate: any = {
-      title: updatedData.title || existingData.title,
-      subtitle: updatedData.subtitle || existingData.subtitle,
-      content: updatedData.content || existingData.content,
-      category: updatedData.category || existingData.category,
-      state: updatedData.state !== undefined ? (updatedData.state || null) : (existingData.state || null),
-      image: updatedData.image || existingData.image,
-      author: updatedData.author || existingData.author,
-      metaDescription: updatedData.metaDescription !== undefined ? updatedData.metaDescription : existingData.metaDescription,
-      isBreaking: updatedData.isBreaking !== undefined ? !!updatedData.isBreaking : existingData.isBreaking,
-      isFeatured: updatedData.isFeatured !== undefined ? !!updatedData.isFeatured : existingData.isFeatured,
-      isTrending: updatedData.isTrending !== undefined ? !!updatedData.isTrending : existingData.isTrending,
-    };
 
-    if (updatedData.tags !== undefined) {
-      fieldsToUpdate.tags = typeof updatedData.tags === "string" 
-        ? (updatedData.tags as string).split(",").map(t => t.trim()).filter(Boolean) 
-        : updatedData.tags;
+    // 1. Update in Disk
+    const diskArticles = await loadNewsFromDisk();
+    const diskIdx = diskArticles.findIndex(a => a.id === articleId);
+    let mergedArticle: any = null;
+
+    if (diskIdx !== -1) {
+      diskArticles[diskIdx] = { ...diskArticles[diskIdx], ...updatedData };
+      mergedArticle = diskArticles[diskIdx];
+    } else {
+      mergedArticle = { id: articleId, ...updatedData };
+      diskArticles.unshift(mergedArticle);
     }
+    await saveNewsToDisk(diskArticles);
 
-    await updateDoc(docRef, fieldsToUpdate);
-
-    // Maintain single featured article constraint on update
-    if (fieldsToUpdate.isFeatured) {
-      try {
-        const querySnapshot = await getDocs(collection(db, "articles"));
-        for (const docSnap of querySnapshot.docs) {
-          if (docSnap.id !== articleId && docSnap.data().isFeatured) {
-            await updateDoc(doc(db, "articles", docSnap.id), { isFeatured: false });
-          }
+    // 2. Update in Firestore
+    try {
+      const docRef = doc(db, "articles", articleId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const existingData = docSnap.data();
+        const fieldsToUpdate: any = {
+          title: updatedData.title || existingData.title,
+          subtitle: updatedData.subtitle || existingData.subtitle,
+          content: updatedData.content || existingData.content,
+          category: updatedData.category || existingData.category,
+          state: updatedData.state !== undefined ? (updatedData.state || null) : (existingData.state || null),
+          image: updatedData.image || existingData.image,
+          author: updatedData.author || existingData.author,
+          metaDescription: updatedData.metaDescription !== undefined ? updatedData.metaDescription : existingData.metaDescription,
+          isBreaking: updatedData.isBreaking !== undefined ? !!updatedData.isBreaking : existingData.isBreaking,
+          isFeatured: updatedData.isFeatured !== undefined ? !!updatedData.isFeatured : existingData.isFeatured,
+          isTrending: updatedData.isTrending !== undefined ? !!updatedData.isTrending : existingData.isTrending,
+        };
+        if (updatedData.tags !== undefined) {
+          fieldsToUpdate.tags = typeof updatedData.tags === "string" 
+            ? (updatedData.tags as string).split(",").map(t => t.trim()).filter(Boolean) 
+            : updatedData.tags;
         }
-      } catch (err) {
-        console.error("Error clearing other featured flags on update: ", err);
+        await updateDoc(docRef, fieldsToUpdate);
+      } else {
+        await setDoc(docRef, mergedArticle, { merge: true });
       }
+    } catch (fsErr) {
+      console.warn("Firestore update warning:", fsErr);
     }
-    
-    const finalDoc = await getDoc(docRef);
-    res.json({ success: true, article: finalDoc.data() });
+
+    res.json({ success: true, article: mergedArticle });
   } catch (err: any) {
-    handleFirestoreError(err, OperationType.UPDATE, `articles/${articleId}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2592,17 +2679,22 @@ app.put("/api/news/:id", async (req, res) => {
 // DELETE news (Admin Only)
 app.delete("/api/news/:id", async (req, res) => {
   const articleId = req.params.id;
-  const docRef = doc(db, "articles", articleId);
   try {
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
-      return res.status(404).json({ error: "आलेख नहीं मिला जिसे हटाया जा सके।" });
+    // 1. Delete from disk
+    const diskArticles = await loadNewsFromDisk();
+    const filtered = diskArticles.filter(a => a.id !== articleId);
+    await saveNewsToDisk(filtered);
+
+    // 2. Delete from Firestore
+    try {
+      const docRef = doc(db, "articles", articleId);
+      await deleteDoc(docRef);
+    } catch (fsErr) {
+      console.warn("Firestore delete warning:", fsErr);
     }
     
-    await deleteDoc(docRef);
     res.json({ success: true });
   } catch (err: any) {
-    handleFirestoreError(err, OperationType.DELETE, `articles/${articleId}`);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2838,7 +2930,7 @@ async function ensureRequestedArticlesExist() {
       category: "national",
       image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?q=80&w=800&auto=format&fit=crop",
       author: "आलोक श्रीवास्तव",
-      date: "21 मई 2026",
+      date: new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
       readTime: 4,
       views: 1250,
       likes: 184,
@@ -2857,7 +2949,7 @@ async function ensureRequestedArticlesExist() {
       category: "sports",
       image: "https://images.unsplash.com/photo-1540747737956-378724043924?q=80&w=800&auto=format&fit=crop",
       author: "राजेश वर्मा",
-      date: "21 मई 2026",
+      date: new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
       readTime: 3,
       views: 980,
       likes: 112,

@@ -6,7 +6,7 @@ export async function fetchNewsList(
   state?: string,
   searchQuery?: string
 ): Promise<Article[]> {
-  let url = `/api/news?category=${category}`;
+  let url = `/api/news?category=${category}&_t=${Date.now()}`;
   if (category === "state" && state) {
     url += `&state=${encodeURIComponent(state)}`;
   }
@@ -15,7 +15,9 @@ export async function fetchNewsList(
   }
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+    });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -69,7 +71,9 @@ export async function fetchNewsList(
 
 export async function fetchArticleById(id: string): Promise<Article | null> {
   try {
-    const res = await fetch(`/api/news/${id}`);
+    const res = await fetch(`/api/news/${id}?_t=${Date.now()}`, {
+      headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+    });
     if (res.ok) {
       return await res.json();
     }

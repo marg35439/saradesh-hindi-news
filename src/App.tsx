@@ -113,7 +113,9 @@ export default function App() {
 
   useEffect(() => {
     const getSidebarWeather = () => {
-      fetch("/api/weather")
+      fetch(`/api/weather?_t=${Date.now()}`, {
+        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+      })
         .then((res) => {
           if (res.ok) return res.json();
           throw new Error();
@@ -134,7 +136,9 @@ export default function App() {
     };
 
     const getMarketData = () => {
-      fetch("/api/market")
+      fetch(`/api/market?_t=${Date.now()}`, {
+        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+      })
         .then((res) => {
           if (res.ok) return res.json();
           throw new Error();
@@ -150,9 +154,20 @@ export default function App() {
     const weatherInterval = setInterval(getSidebarWeather, 20000);
     const marketInterval = setInterval(getMarketData, 15000);
 
+    // Refresh data when browser tab becomes active
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        getMarketData();
+        getSidebarWeather();
+        loadNews();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       clearInterval(weatherInterval);
       clearInterval(marketInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
