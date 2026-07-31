@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs/promises";
 import fsDirect from "fs";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import cors from "cors";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -3159,7 +3158,8 @@ app.get("/sitemap-index.xml", (req, res) => {
 
 async function startServer() {
   // Serve static Vite site in prod when running as standalone Node process (not Vercel serverless)
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -3174,14 +3174,14 @@ async function startServer() {
     });
   }
 
-  // Ensure these requested articles exist in the database
-  try {
-    await ensureRequestedArticlesExist();
-  } catch (e) {
-    console.warn("Non-blocking error checking startup articles:", e);
-  }
-
   if (!process.env.VERCEL) {
+    // Ensure these requested articles exist in the database
+    try {
+      await ensureRequestedArticlesExist();
+    } catch (e) {
+      console.warn("Non-blocking error checking startup articles:", e);
+    }
+
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Dainik Bhaskar custom server listening on port ${PORT}`);
     });
