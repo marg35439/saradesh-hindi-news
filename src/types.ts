@@ -24,6 +24,7 @@ export interface Article {
   isBreaking: boolean;
   isFeatured: boolean;
   isTrending: boolean;
+  createdAt?: string;
 }
 
 export type CategoryKey = 'all' | 'national' | 'international' | 'state' | 'sports' | 'entertainment' | 'business' | 'tech' | 'lifestyle' | 'job' | 'education' | 'religion' | 'astrology' | 'schemes';

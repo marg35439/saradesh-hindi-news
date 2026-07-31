@@ -3,10 +3,17 @@ import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, 
 import { motion } from "motion/react";
 import { Article, CATEGORIES, STATES } from "../types";
 import { fetchNewsList, saveArticleClient, deleteArticleClient } from "../lib/newsClient";
-import { auth } from "../lib/firebase";
+import {
+  auth,
+  getUserRoleProfile,
+  fetchAllUsers,
+  createNewUserByAdmin,
+  updateUserRoleInFirestore,
+  deleteUserRecordFromFirestore,
+  UserRoleData
+} from "../lib/firebase";
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User
@@ -246,17 +253,27 @@ const parseBatchNewsText = (text: string) => {
 };
 
 export default function AdminPanel() {
-  // Firebase Authentication states
+  // Firebase Authentication & Roles states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserRoleData | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
+  // Super Admin Users Management states
+  const [usersList, setUsersList] = useState<UserRoleData[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPass, setNewUserPass] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"editor" | "super_admin">("editor");
+  const [userFormMsg, setUserFormMsg] = useState("");
+  const [userFormError, setUserFormError] = useState("");
+  const [creatingUser, setCreatingUser] = useState(false);
+
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch" | "users">("list");
 
   const isAuthenticated = !!currentUser;
 
@@ -273,15 +290,41 @@ export default function AdminPanel() {
       });
   };
 
+  const loadUsersList = async () => {
+    setLoadingUsers(true);
+    try {
+      const list = await fetchAllUsers();
+      setUsersList(list);
+    } catch (err) {
+      console.error("Error loading users list:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
+        try {
+          const profile = await getUserRoleProfile(user.uid, user.email || "");
+          setUserProfile(profile);
+        } catch (err) {
+          console.error("Profile load error:", err);
+        }
         loadArticles();
+      } else {
+        setUserProfile(null);
       }
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "users" && userProfile?.role === "super_admin") {
+      loadUsersList();
+    }
+  }, [activeTab, userProfile]);
   
   // Bulk Batch Importer & Photo Matcher States
   const [batchNewsText, setBatchNewsText] = useState("");
@@ -756,18 +799,12 @@ export default function AdminPanel() {
     setAuthError("");
     setAuthLoading(true);
     try {
-      if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput.trim());
-      } else {
-        await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput.trim());
-      }
+      await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput.trim());
     } catch (err: any) {
       console.error("Firebase Auth error:", err);
       let msg = err.message || "प्रमाणीकरण विफल।";
       if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-        msg = "गलत ईमेल या पासवर्ड! यदि आपका खाता नहीं बना है तो 'नया एडमिन खाता बनाएं' विकल्प चुनें।";
-      } else if (err.code === "auth/email-already-in-use") {
-        msg = "यह ईमेल पहले से पंजीकृत है। कृपया लॉगिन करें।";
+        msg = "गलत ईमेल या पासवर्ड! कृपया सही लॉगिन क्रैडेंशियल दर्ज करें। (खाता सुपर एडमिन द्वारा बनाया जाता है)";
       } else if (err.code === "auth/weak-password") {
         msg = "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
       }
@@ -783,8 +820,69 @@ export default function AdminPanel() {
       setEmailInput("");
       setPasswordInput("");
       setAuthError("");
+      setUserProfile(null);
     } catch (err: any) {
       console.error("Logout error:", err);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserEmail.trim() || !newUserPass.trim()) {
+      setUserFormError("ईमेल और पासवर्ड दोनों आवश्यक हैं।");
+      return;
+    }
+    setUserFormError("");
+    setUserFormMsg("");
+    setCreatingUser(true);
+    try {
+      await createNewUserByAdmin(newUserEmail.trim(), newUserPass.trim(), newUserRole);
+      setUserFormMsg(`सफलतापूर्वक नया खाता (${newUserEmail.trim()}) बनाया गया!`);
+      setNewUserEmail("");
+      setNewUserPass("");
+      setNewUserRole("editor");
+      loadUsersList();
+    } catch (err: any) {
+      console.error(err);
+      let msg = err.message || "यूज़र खाता बनाने में विफलता।";
+      if (err.code === "auth/email-already-in-use") {
+        msg = "यह ईमेल पहले से रजिस्टर्ड है।";
+      } else if (err.code === "auth/weak-password") {
+        msg = "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
+      }
+      setUserFormError(msg);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleToggleUserRole = async (targetUid: string, currentRole: "editor" | "super_admin") => {
+    if (targetUid === currentUser?.uid) {
+      alert("आप अपना स्वयं का रोल नहीं बदल सकते।");
+      return;
+    }
+    const newRole = currentRole === "super_admin" ? "editor" : "super_admin";
+    try {
+      await updateUserRoleInFirestore(targetUid, newRole);
+      loadUsersList();
+    } catch (err) {
+      console.error(err);
+      alert("रोल बदलने में विफलता।");
+    }
+  };
+
+  const handleDeleteUserRecord = async (targetUid: string, targetEmail: string) => {
+    if (targetUid === currentUser?.uid) {
+      alert("आप अपना स्वयं का खाता नहीं हटा सकते।");
+      return;
+    }
+    if (!confirm(`क्या आप सचमुच ${targetEmail} का यूज़र रिकॉर्ड हटाना चाहते हैं?`)) return;
+    try {
+      await deleteUserRecordFromFirestore(targetUid);
+      loadUsersList();
+    } catch (err) {
+      console.error(err);
+      alert("यूज़र रिकॉर्ड हटाने में विफलता।");
     }
   };
 
@@ -991,21 +1089,8 @@ export default function AdminPanel() {
               ) : (
                 <Unlock className="w-4 h-4" />
               )}
-              <span>{isRegistering ? "नया एडमिन खाता बनाएं (Register)" : "कंट्रोल पैनल खोलें (Firebase Sign In)"}</span>
+              <span>कंट्रोल पैनल खोलें (Admin Sign In)</span>
             </button>
-
-            <div className="text-center pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setAuthError("");
-                }}
-                className="text-xs font-bold text-neutral-500 hover:text-[#ff6f00] underline font-sans cursor-pointer"
-              >
-                {isRegistering ? "पहले से पंजीकृत हैं? लॉगिन करें" : "नया एडमिन खाता बनाना चाहते हैं? (Create Admin)"}
-              </button>
-            </div>
           </form>
 
           <div className="mt-6 pt-5 border-t border-neutral-100 text-center">
@@ -1032,6 +1117,12 @@ export default function AdminPanel() {
         </div>
 
         <div className='flex items-center gap-3'>
+          <div className="text-right hidden sm:block">
+            <div className="text-xs font-extrabold text-neutral-800 font-sans">{currentUser?.email}</div>
+            <div className="text-[10px] font-bold text-[#ff6f00] uppercase tracking-wider font-sans">
+              {userProfile?.role === "super_admin" ? "👑 Super Admin" : "✍️ Editor"}
+            </div>
+          </div>
           <button
             onClick={handleLogout}
             className='flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold bg-neutral-100 hover:bg-red-50 text-neutral-700 hover:text-red-600 border border-neutral-200 cursor-pointer transition-colors'
@@ -1118,6 +1209,19 @@ export default function AdminPanel() {
         >
           📸 स्क्रीनशॉट से समाचार एआई
         </button>
+
+        {userProfile?.role === "super_admin" && (
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+              activeTab === "users"
+                ? "border-[#ff6f00] text-[#ff6f00]"
+                : "border-transparent text-neutral-500 hover:text-neutral-800"
+            }`}
+          >
+            👥 उपयोगकर्ता एवं संपादक प्रबंधन
+          </button>
+        )}
       </div>
 
       {/* TAB CONTENT: NEWS LIST */}
@@ -2882,6 +2986,172 @@ export default function AdminPanel() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB CONTENT: USERS & EDITORS MANAGEMENT (SUPER ADMIN ONLY) */}
+      {activeTab === "users" && userProfile?.role === "super_admin" && (
+        <div className="space-y-6 font-sans">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Create New User Form */}
+            <div className="lg:col-span-1 bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs">
+              <div className="flex items-center gap-2 mb-4 text-neutral-900 font-extrabold text-base border-b pb-3">
+                <UserCheck className="w-5 h-5 text-[#ff6f00]" />
+                <span>नया उपयोगकर्ता / संपादक जोड़ें</span>
+              </div>
+
+              <form onSubmit={handleCreateUser} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">ईमेल पता (Email):</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="editor@saradesh.in"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">पासवर्ड (Password):</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="कम से कम 6 अक्षर..."
+                    value={newUserPass}
+                    onChange={(e) => setNewUserPass(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">भूमिका / रोल (Role):</label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as "editor" | "super_admin")}
+                    className="w-full text-xs p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-bold text-neutral-800"
+                  >
+                    <option value="editor">✍️ संपादक (Editor - केवल खबरें बना व बदल सकते हैं)</option>
+                    <option value="super_admin">👑 सुपर एडमिन (Super Admin - सभी अधिकार)</option>
+                  </select>
+                </div>
+
+                {userFormError && (
+                  <div className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{userFormError}</span>
+                  </div>
+                )}
+
+                {userFormMsg && (
+                  <div className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 p-3 rounded-xl flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span>{userFormMsg}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="w-full py-3 bg-[#ff6f00] hover:bg-amber-600 text-white font-extrabold rounded-xl transition-colors cursor-pointer text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-600/15 disabled:opacity-50"
+                >
+                  {creatingUser ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  <span>खाता तैयार करें (Create Account)</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Registered Users List */}
+            <div className="lg:col-span-2 bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs">
+              <div className="flex items-center justify-between gap-2 mb-4 border-b pb-3">
+                <div className="text-neutral-900 font-extrabold text-base flex items-center gap-2">
+                  <span>पंजीकृत उपयोगकर्ता सूची ({usersList.length})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadUsersList}
+                  className="p-2 text-neutral-500 hover:text-[#ff6f00] rounded-lg border hover:border-[#ff6f00] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>रिफ्रेश</span>
+                </button>
+              </div>
+
+              {loadingUsers ? (
+                <div className="py-12 text-center text-xs text-neutral-400 font-sans animate-pulse">
+                  उपयोगकर्ता डेटा लोड हो रहा है...
+                </div>
+              ) : usersList.length === 0 ? (
+                <div className="py-12 text-center text-xs text-neutral-500 font-sans">
+                  कोई पंजीकृत यूज़र नहीं मिला।
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {usersList.map((usr) => (
+                    <div
+                      key={usr.uid}
+                      className="p-4 border border-neutral-200 rounded-xl bg-neutral-50 hover:bg-white transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="text-xs font-black text-neutral-900 flex items-center gap-2">
+                          <span>{usr.email}</span>
+                          {usr.uid === currentUser?.uid && (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                              (आप)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-neutral-400 mt-1">
+                          UID: {usr.uid} • पंजीकृत: {new Date(usr.createdAt).toLocaleDateString("hi-IN")}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <span
+                          className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                            usr.role === "super_admin"
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : "bg-blue-50 text-blue-800 border border-blue-200"
+                          }`}
+                        >
+                          {usr.role === "super_admin" ? "👑 Super Admin" : "✍️ Editor"}
+                        </span>
+
+                        {usr.uid !== currentUser?.uid && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserRole(usr.uid, usr.role)}
+                              className="text-[10px] font-bold px-2.5 py-1 bg-white border border-neutral-300 hover:border-[#ff6f00] text-neutral-700 hover:text-[#ff6f00] rounded-lg transition-colors cursor-pointer"
+                              title="रोल बदलें"
+                            >
+                              {usr.role === "super_admin" ? "संपादक बनाएं" : "सुपर एडमिन बनाएं"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUserRecord(usr.uid, usr.email)}
+                              className="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="हटाएं"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       )}
 
