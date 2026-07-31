@@ -21,9 +21,18 @@ export async function fetchNewsList(
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        // Keep local storage in sync when fetching all news
-        if (category === "all" && (!state || state === "सभी राज्य") && !searchQuery) {
-          saveLocalArticles(data);
+        // Keep local storage in sync when fetching news
+        if (!searchQuery) {
+          if (category === "all" && (!state || state === "सभी राज्य")) {
+            saveLocalArticles(data);
+          } else {
+            // Merge with existing local articles
+            const current = getLocalArticles();
+            const map = new Map<string, Article>();
+            current.forEach(item => map.set(item.id, item));
+            data.forEach((item: Article) => map.set(item.id, item));
+            saveLocalArticles(Array.from(map.values()));
+          }
         }
         return data;
       }
