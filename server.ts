@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Article } from "./src/types";
-import { FALLBACK_NEWS } from "./src/data/fallbackNews";
+import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
 
 // Firebase Imports
 import { initializeApp } from "firebase/app";
