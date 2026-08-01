@@ -4,6 +4,8 @@ import { motion } from "motion/react";
 import { Article, Comment, CATEGORIES } from "../types";
 import { fetchArticleById, likeArticleClient, addCommentClient, fetchNewsList } from "../lib/newsClient";
 import AudioNewsReader from "./AudioNewsReader";
+import { SEOHead } from "./SEOHead";
+import { AdBanner } from "./AdBanner";
 
 interface ArticleDetailProps {
   articleId: string;
@@ -12,6 +14,7 @@ interface ArticleDetailProps {
   onToggleBookmark?: (e: React.MouseEvent, article: Article) => void;
   allArticles?: Article[];
   onArticleSelect?: (article: Article) => void;
+  onAuthorClick?: (authorName: string) => void;
 }
 
 export default function ArticleDetail({ 
@@ -20,7 +23,8 @@ export default function ArticleDetail({
   isBookmarked = false, 
   onToggleBookmark,
   allArticles,
-  onArticleSelect
+  onArticleSelect,
+  onAuthorClick
 }: ArticleDetailProps) {
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
@@ -393,6 +397,8 @@ export default function ArticleDetail({
       transition={{ duration: 0.3 }}
       className="max-w-3xl mx-auto px-4 py-6 md:py-10 pb-20"
     >
+      <SEOHead article={article} />
+
       {/* Navigation Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-50 p-2.5 sm:p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
         <div className="flex items-center gap-2.5">
@@ -473,7 +479,13 @@ export default function ArticleDetail({
             {article.author.substring(0, 1)}
           </div>
           <div>
-            <div className="text-sm font-bold text-neutral-900">रिपोर्टर: {article.author}</div>
+            <button
+              onClick={() => onAuthorClick && onAuthorClick(article.author)}
+              className="text-sm font-bold text-neutral-900 hover:text-amber-700 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span>रिपोर्टर: {article.author}</span>
+              <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-bold">प्रोफाइल देखें →</span>
+            </button>
             <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
               <Calendar className="w-3.5 h-3.5" />
               <span>प्रकाशित: {article.date}</span>

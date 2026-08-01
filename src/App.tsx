@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Newspaper, Flame, Heart, MessageSquare, Eye, ArrowRight, CornerDownRight, RefreshCw, Layers, Check, ThumbsUp, MapPin, Sun, Award, HelpCircle, Cloud, CloudRain, CloudSun, Grid, ListFilter, Bookmark, Radio, Briefcase, GraduationCap, Sparkles, Landmark, Compass, ChevronRight, Shield, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { Newspaper, Flame, Heart, MessageSquare, Eye, ArrowRight, CornerDownRight, RefreshCw, Layers, Check, ThumbsUp, MapPin, Sun, Award, HelpCircle, Cloud, CloudRain, CloudSun, Grid, ListFilter, Bookmark, Radio, Briefcase, GraduationCap, Sparkles, Landmark, Compass, ChevronRight, Shield, TrendingUp, TrendingDown, BarChart3, FileText, Scale, CheckSquare, Building, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import BreakingNews from "./components/BreakingNews";
@@ -10,6 +10,11 @@ import AdminPanel from "./components/AdminPanel";
 import AudioNewsReader from "./components/AudioNewsReader";
 import SavedArticlesModal from "./components/SavedArticlesModal";
 import MobileBottomNav from "./components/MobileBottomNav";
+import { SEOHead } from "./components/SEOHead";
+import { AuthorProfile } from "./components/AuthorProfile";
+import { PolicyPages } from "./components/PolicyPages";
+import { AdBanner } from "./components/AdBanner";
+import { initGA, logPageView } from "./lib/analytics";
 import { Article, CategoryKey, CATEGORIES, STATES } from "./types";
 import { fetchNewsList } from "./lib/newsClient";
 
@@ -18,6 +23,8 @@ export default function App() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
+  const [selectedPolicyPage, setSelectedPolicyPage] = useState<"editorial-policy" | "corrections-policy" | "fact-check-policy" | "publisher-info" | "about-us" | "contact-us" | null>(null);
   
   // Dense compact view toggle
   const [isCompactView, setIsCompactView] = useState(false);
@@ -186,7 +193,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?state=...
+    initGA();
+    logPageView(window.location.pathname + window.location.search);
+
+    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?state=..., ?author=..., ?page=...
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") {
       setIsAdminMode(true);
@@ -202,6 +212,14 @@ export default function App() {
     const initialState = params.get("state");
     if (initialState) {
       setSelectedState(initialState);
+    }
+    const initialAuthor = params.get("author");
+    if (initialAuthor) {
+      setSelectedAuthor(initialAuthor);
+    }
+    const initialPage = params.get("page");
+    if (initialPage) {
+      setSelectedPolicyPage(initialPage as any);
     }
 
     // 2. Popstate listener for browser back/forward buttons
@@ -220,7 +238,11 @@ export default function App() {
         setSelectedState(st);
       }
 
+      setSelectedAuthor(p.get("author") || null);
+      setSelectedPolicyPage((p.get("page") as any) || null);
+
       setIsAdminMode(p.get("admin") === "true");
+      logPageView(window.location.pathname + window.location.search);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -498,6 +520,68 @@ export default function App() {
                 onToggleBookmark={(e, art) => toggleBookmark(e, art)}
                 allArticles={articles}
                 onArticleSelect={(art) => handleArticleClick(art)}
+                onAuthorClick={(authorName) => {
+                  setSelectedArticleId(null);
+                  setSelectedPolicyPage(null);
+                  setSelectedAuthor(authorName);
+                  try {
+                    window.history.pushState({}, "", "?author=" + encodeURIComponent(authorName));
+                  } catch {}
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </motion.div>
+          )
+
+          // AUTHOR PROFILE MODE
+          : selectedAuthor ? (
+            <motion.div
+              key="author"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SEOHead authorName={selectedAuthor} />
+              <AuthorProfile
+                authorName={selectedAuthor}
+                articles={articles}
+                onArticleClick={(art) => handleArticleClick(art)}
+                onBack={() => {
+                  setSelectedAuthor(null);
+                  try {
+                    window.history.pushState({}, "", "/");
+                  } catch {}
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                onBookmarkToggle={(artId) => {
+                  const art = articles.find(a => a.id === artId);
+                  if (art) toggleBookmark(new MouseEvent("click") as any, art);
+                }}
+                savedArticleIds={savedArticleIds}
+              />
+            </motion.div>
+          )
+
+          // POLICY & ABOUT PAGES MODE
+          : selectedPolicyPage ? (
+            <motion.div
+              key="policy"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SEOHead pageTitle={selectedPolicyPage.replace("-", " ").toUpperCase()} />
+              <PolicyPages
+                pageType={selectedPolicyPage}
+                onBack={() => {
+                  setSelectedPolicyPage(null);
+                  try {
+                    window.history.pushState({}, "", "/");
+                  } catch {}
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
               />
             </motion.div>
           )
@@ -511,6 +595,9 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
             >
+              <SEOHead
+                categoryName={selectedCategory !== "all" ? (CATEGORIES.find(c => c.key === selectedCategory)?.label || selectedCategory) : undefined}
+              />
               
               {/* PRIMARY CONTENT BLOCK: Center & Left feed */}
               <div className="lg:col-span-8 space-y-6">
@@ -1240,18 +1327,58 @@ export default function App() {
           </div>
 
           <div>
-            <div className="text-white font-bold text-xs mb-3 uppercase tracking-wider">अस्वीकरण एवं प्रशासनिक एक्सेस</div>
-            <p className="leading-relaxed text-neutral-400">
-              © 2026 सारादेश.in समाचार प्रा. लि. सर्वाधिकार सुरक्षित। वेबसाइट पर प्रदर्शित सभी समाचार और सामग्री प्रामाणिक स्रोतों पर आधारित है।
+            <div className="text-white font-bold text-xs mb-3 uppercase tracking-wider">संपादकीय एवं नीतिगत जानकारी (Policies & About)</div>
+            <div className="flex flex-wrap gap-2 text-xs mb-4">
+              {[
+                { id: "about-us", label: "हमारे बारे में" },
+                { id: "editorial-policy", label: "संपादकीय नीति" },
+                { id: "corrections-policy", label: "सुधार नीति" },
+                { id: "fact-check-policy", label: "फैक्ट चेक नीति" },
+                { id: "publisher-info", label: "प्रकाशक जानकारी" },
+                { id: "contact-us", label: "संपर्क करें" }
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedArticleId(null);
+                    setSelectedAuthor(null);
+                    setSelectedPolicyPage(p.id as any);
+                    try {
+                      window.history.pushState({}, "", "?page=" + p.id);
+                    } catch {}
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded border border-neutral-700/80 text-[11px] font-medium transition-all cursor-pointer"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-[10px] text-neutral-400 mb-4 pt-2 border-t border-neutral-800">
+              <a href="/rss.xml" target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 underline">📡 RSS 2.0 Feed</a>
+              <span>•</span>
+              <a href="/news-sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 underline">📰 Google News Sitemap</a>
+              <span>•</span>
+              <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 underline">🗺️ XML Sitemap</a>
+              <span>•</span>
+              <a href="/ads.txt" target="_blank" rel="noopener noreferrer" className="hover:text-amber-400 underline">📄 Ads.txt</a>
+            </div>
+
+            <div className="text-white font-bold text-xs mb-2 uppercase tracking-wider">अस्वीकरण एवं प्रशासनिक एक्सेस</div>
+            <p className="leading-relaxed text-neutral-400 text-xs">
+              © 2026 सारादेश.in समाचार प्रा. लि. सर्वाधिकार सुरक्षित। प्रेस काउंसिल ऑफ इंडिया (PCI) गाइडलाइंस अनुपालित।
             </p>
             <button 
               onClick={() => {
                 setIsAdminMode((prev) => !prev);
                 setSelectedArticleId(null);
+                setSelectedAuthor(null);
+                setSelectedPolicyPage(null);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               title="एडमिन पैनल खोलने के लिए क्लिक करें"
-              className="mt-4 px-3.5 py-2 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 hover:text-white border border-amber-500/50 hover:border-amber-400 rounded-xl text-xs font-black inline-flex items-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
+              className="mt-3 px-3.5 py-2 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 hover:text-white border border-amber-500/50 hover:border-amber-400 rounded-xl text-xs font-black inline-flex items-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95"
             >
               <Shield className="w-4 h-4 text-amber-400 animate-pulse" />
               <span>{isAdminMode ? "यूजर पोर्टल पर लौटें" : "🔐 एडमिन पैनल (Admin Login)"}</span>

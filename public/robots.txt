@@ -2,4 +2,5 @@ User-agent: *
 Allow: /
 
 Sitemap: https://saradesh.in/sitemap.xml
-Sitemap: https://saradesh.in/sitemap-index.xml
+Sitemap: https://saradesh.in/news-sitemap.xml
+Sitemap: https://saradesh.in/rss.xml

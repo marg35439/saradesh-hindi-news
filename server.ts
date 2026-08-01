@@ -2954,21 +2954,39 @@ async function ensureRequestedArticlesExist() {
   }
 }
 
-// SEO & Search Console: Robots.txt and Dynamic XML Sitemap handlers
+// SEO, RSS & Search Console Endpoints
+function escapeXml(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain");
   res.send(`User-agent: *
 Allow: /
 
 Sitemap: https://saradesh.in/sitemap.xml
+Sitemap: https://saradesh.in/news-sitemap.xml
 Sitemap: https://saradesh.in/sitemap-index.xml
+Sitemap: https://saradesh.in/rss.xml
 `);
+});
+
+app.get("/ads.txt", (req, res) => {
+  res.type("text/plain");
+  res.send("google.com, pub-0000000000000000, DIRECT, f08c47fec3d042cd\n");
 });
 
 async function generateSitemapXml(hostHeader?: string): Promise<string> {
   const domain = "saradesh.in";
   const baseUrl = `https://${domain}`;
-  const categories = ["national", "state", "business", "sports", "entertainment", "tech", "lifestyle", "international"];
+  const categories = ["national", "state", "crime", "business", "sports", "entertainment", "tech", "lifestyle", "international", "job", "education", "religion", "astrology", "schemes"];
+  const policyPages = ["about-us", "editorial-policy", "corrections-policy", "fact-check-policy", "publisher-info", "contact-us"];
 
   let articlesList: any[] = [];
   try {
@@ -2978,6 +2996,9 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
     });
   } catch (err) {
     console.warn("Sitemap: Failed to load articles from Firestore, fallback to defaults", err);
+    articlesList = DEFAULT_NEWS;
+  }
+  if (!articlesList || articlesList.length === 0) {
     articlesList = DEFAULT_NEWS;
   }
 
@@ -3004,9 +3025,21 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
     xml += `  </url>\n`;
   }
 
+  // Policy Pages
+  for (const page of policyPages) {
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/?page=${page}</loc>\n`;
+    xml += `    <lastmod>${currentDate}</lastmod>\n`;
+    xml += `    <changefreq>monthly</changefreq>\n`;
+    xml += `    <priority>0.5</priority>\n`;
+    xml += `  </url>\n`;
+  }
+
   // Articles
+  const authorsSet = new Set<string>();
   for (const art of articlesList) {
     if (!art || !art.id) continue;
+    if (art.author) authorsSet.add(art.author);
     const artDate = art.createdAt ? new Date(art.createdAt).toISOString().split("T")[0] : currentDate;
     xml += `  <url>\n`;
     xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
@@ -3014,16 +3047,9 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
     xml += `    <changefreq>daily</changefreq>\n`;
     xml += `    <priority>0.9</priority>\n`;
     if (art.title) {
-      const escapeXml = (str: string) =>
-        str
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&apos;");
       xml += `    <news:news>\n`;
       xml += `      <news:publication>\n`;
-      xml += `        <news:name>सारादेश.in</news:name>\n`;
+      xml += `        <news:name>सारादेश</news:name>\n`;
       xml += `        <news:language>hi</news:language>\n`;
       xml += `      </news:publication>\n`;
       xml += `      <news:publication_date>${artDate}</news:publication_date>\n`;
@@ -3033,7 +3059,129 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
     xml += `  </url>\n`;
   }
 
+  // Authors
+  for (const author of authorsSet) {
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/?author=${encodeURIComponent(author)}</loc>\n`;
+    xml += `    <lastmod>${currentDate}</lastmod>\n`;
+    xml += `    <changefreq>weekly</changefreq>\n`;
+    xml += `    <priority>0.6</priority>\n`;
+    xml += `  </url>\n`;
+  }
+
   xml += `</urlset>`;
+  return xml;
+}
+
+async function generateNewsSitemapXml(): Promise<string> {
+  const domain = "saradesh.in";
+  const baseUrl = `https://${domain}`;
+  let articlesList: any[] = [];
+  try {
+    const querySnapshot = await getDocs(collection(db, "articles"));
+    querySnapshot.forEach((docSnap) => {
+      articlesList.push(docSnap.data());
+    });
+  } catch (err) {
+    articlesList = DEFAULT_NEWS;
+  }
+  if (!articlesList || articlesList.length === 0) {
+    articlesList = DEFAULT_NEWS;
+  }
+
+  const now = new Date().getTime();
+  const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+  let recentArticles = articlesList.filter((art) => {
+    if (!art.createdAt) return true;
+    const artTime = new Date(art.createdAt).getTime();
+    return !isNaN(artTime) && now - artTime <= fortyEightHoursMs;
+  });
+
+  if (recentArticles.length === 0) {
+    recentArticles = [...articlesList].sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    }).slice(0, 30);
+  }
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">\n`;
+
+  for (const art of recentArticles) {
+    if (!art || !art.id) continue;
+    const artIsoDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
+    xml += `    <news:news>\n`;
+    xml += `      <news:publication>\n`;
+    xml += `        <news:name>सारादेश</news:name>\n`;
+    xml += `        <news:language>hi</news:language>\n`;
+    xml += `      </news:publication>\n`;
+    xml += `      <news:publication_date>${artIsoDate}</news:publication_date>\n`;
+    xml += `      <news:title>${escapeXml(art.title)}</news:title>\n`;
+    xml += `    </news:news>\n`;
+    xml += `  </url>\n`;
+  }
+
+  xml += `</urlset>`;
+  return xml;
+}
+
+async function generateRssFeedXml(): Promise<string> {
+  const domain = "saradesh.in";
+  const baseUrl = `https://${domain}`;
+  let articlesList: any[] = [];
+  try {
+    const querySnapshot = await getDocs(collection(db, "articles"));
+    querySnapshot.forEach((docSnap) => {
+      articlesList.push(docSnap.data());
+    });
+  } catch (err) {
+    articlesList = DEFAULT_NEWS;
+  }
+  if (!articlesList || articlesList.length === 0) {
+    articlesList = DEFAULT_NEWS;
+  }
+
+  articlesList.sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  const lastBuildDate = new Date().toUTCString();
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">\n`;
+  xml += `  <channel>\n`;
+  xml += `    <title>सारादेश - ताज़ा हिंदी समाचार</title>\n`;
+  xml += `    <link>${baseUrl}/</link>\n`;
+  xml += `    <description>सारादेश पर पढ़ें भारत, राज्य, दुनिया, राजनीति, खेल, व्यापार, मनोरंजन, टेक्नोलॉजी और अन्य श्रेणियों की ताज़ा और विश्वसनीय हिंदी खबरें।</description>\n`;
+  xml += `    <language>hi</language>\n`;
+  xml += `    <lastBuildDate>${lastBuildDate}</lastBuildDate>\n`;
+  xml += `    <atom:link href="${baseUrl}/rss.xml" rel="self" type="application/rss+xml" />\n`;
+
+  for (const art of articlesList.slice(0, 50)) {
+    if (!art || !art.id) continue;
+    const pubDate = art.createdAt ? new Date(art.createdAt).toUTCString() : new Date().toUTCString();
+    const artUrl = `${baseUrl}/?article=${encodeURIComponent(art.id)}`;
+    xml += `    <item>\n`;
+    xml += `      <title>${escapeXml(art.title)}</title>\n`;
+    xml += `      <link>${artUrl}</link>\n`;
+    xml += `      <guid isPermaLink="true">${artUrl}</guid>\n`;
+    xml += `      <description>${escapeXml(art.subtitle || art.content.substring(0, 200))}</description>\n`;
+    xml += `      <pubDate>${pubDate}</pubDate>\n`;
+    xml += `      <dc:creator>${escapeXml(art.author || "सम्पादकीय टीम")}</dc:creator>\n`;
+    xml += `      <category>${escapeXml(art.category || "General")}</category>\n`;
+    if (art.image) {
+      xml += `      <enclosure url="${escapeXml(art.image)}" length="102400" type="image/jpeg" />\n`;
+    }
+    xml += `    </item>\n`;
+  }
+
+  xml += `  </channel>\n`;
+  xml += `</rss>`;
   return xml;
 }
 
@@ -3048,12 +3196,38 @@ app.get(["/sitemap.xml", "/api/sitemap"], async (req, res) => {
   }
 });
 
+app.get(["/news-sitemap.xml", "/api/news-sitemap"], async (req, res) => {
+  try {
+    const xml = await generateNewsSitemapXml();
+    res.header("Content-Type", "application/xml; charset=utf-8");
+    res.status(200).send(xml);
+  } catch (err: any) {
+    console.error("Error generating news sitemap:", err);
+    res.status(500).send("Error generating news sitemap: " + err.message);
+  }
+});
+
+app.get(["/rss.xml", "/feed.xml", "/api/rss"], async (req, res) => {
+  try {
+    const xml = await generateRssFeedXml();
+    res.header("Content-Type", "application/rss+xml; charset=utf-8");
+    res.status(200).send(xml);
+  } catch (err: any) {
+    console.error("Error generating RSS feed:", err);
+    res.status(500).send("Error generating RSS feed: " + err.message);
+  }
+});
+
 app.get("/sitemap-index.xml", (req, res) => {
   const currentDate = new Date().toISOString().split("T")[0];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
     <loc>https://saradesh.in/sitemap.xml</loc>
+    <lastmod>${currentDate}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://saradesh.in/news-sitemap.xml</loc>
     <lastmod>${currentDate}</lastmod>
   </sitemap>
 </sitemapindex>`;
