@@ -144,7 +144,9 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+if (!process.env.VERCEL) {
+  testConnection();
+}
 
 // Initialize Gemini SDK lazily to avoid crash on startup if key is missing
 let aiClient: GoogleGenAI | null = null;
@@ -2955,14 +2957,42 @@ async function ensureRequestedArticlesExist() {
 }
 
 // SEO, RSS & Search Console Endpoints
-function escapeXml(str: string): string {
-  if (!str) return "";
+function escapeXml(str: any): string {
+  if (str === null || str === undefined) return "";
+  if (typeof str !== "string") str = String(str);
   return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+async function fetchArticlesFromFirestoreWithTimeout(timeoutMs = 2500): Promise<any[]> {
+  try {
+    const fetchPromise = (async () => {
+      const querySnapshot = await getDocs(collection(db, "articles"));
+      const list: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        if (d) list.push(d);
+      });
+      return list;
+    })();
+
+    const timeoutPromise = new Promise<any[]>((_, reject) =>
+      setTimeout(() => reject(new Error("Firestore fetch timed out")), timeoutMs)
+    );
+
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+    if (Array.isArray(result) && result.length > 0) {
+      return result;
+    }
+    return DEFAULT_NEWS;
+  } catch (err) {
+    console.warn("Firestore XML fetch fallback to DEFAULT_NEWS:", err);
+    return DEFAULT_NEWS;
+  }
 }
 
 app.get("/robots.txt", (req, res) => {
@@ -2988,20 +3018,7 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
   const categories = ["national", "state", "crime", "business", "sports", "entertainment", "tech", "lifestyle", "international", "job", "education", "religion", "astrology", "schemes"];
   const policyPages = ["about-us", "editorial-policy", "corrections-policy", "fact-check-policy", "publisher-info", "contact-us"];
 
-  let articlesList: any[] = [];
-  try {
-    const querySnapshot = await getDocs(collection(db, "articles"));
-    querySnapshot.forEach((docSnap) => {
-      articlesList.push(docSnap.data());
-    });
-  } catch (err) {
-    console.warn("Sitemap: Failed to load articles from Firestore, fallback to defaults", err);
-    articlesList = DEFAULT_NEWS;
-  }
-  if (!articlesList || articlesList.length === 0) {
-    articlesList = DEFAULT_NEWS;
-  }
-
+  const articlesList = await fetchArticlesFromFirestoreWithTimeout(2500);
   const currentDate = new Date().toISOString().split("T")[0];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -3039,7 +3056,7 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
   const authorsSet = new Set<string>();
   for (const art of articlesList) {
     if (!art || !art.id) continue;
-    if (art.author) authorsSet.add(art.author);
+    if (art.author && typeof art.author === "string") authorsSet.add(art.author);
     const artDate = art.createdAt ? new Date(art.createdAt).toISOString().split("T")[0] : currentDate;
     xml += `  <url>\n`;
     xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
@@ -3076,31 +3093,20 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
 async function generateNewsSitemapXml(): Promise<string> {
   const domain = "saradesh.in";
   const baseUrl = `https://${domain}`;
-  let articlesList: any[] = [];
-  try {
-    const querySnapshot = await getDocs(collection(db, "articles"));
-    querySnapshot.forEach((docSnap) => {
-      articlesList.push(docSnap.data());
-    });
-  } catch (err) {
-    articlesList = DEFAULT_NEWS;
-  }
-  if (!articlesList || articlesList.length === 0) {
-    articlesList = DEFAULT_NEWS;
-  }
+  const articlesList = await fetchArticlesFromFirestoreWithTimeout(2500);
 
   const now = new Date().getTime();
   const fortyEightHoursMs = 48 * 60 * 60 * 1000;
   let recentArticles = articlesList.filter((art) => {
-    if (!art.createdAt) return true;
+    if (!art || !art.createdAt) return true;
     const artTime = new Date(art.createdAt).getTime();
     return !isNaN(artTime) && now - artTime <= fortyEightHoursMs;
   });
 
   if (recentArticles.length === 0) {
     recentArticles = [...articlesList].sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const timeA = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return timeB - timeA;
     }).slice(0, 30);
   }
@@ -3131,22 +3137,11 @@ async function generateNewsSitemapXml(): Promise<string> {
 async function generateRssFeedXml(): Promise<string> {
   const domain = "saradesh.in";
   const baseUrl = `https://${domain}`;
-  let articlesList: any[] = [];
-  try {
-    const querySnapshot = await getDocs(collection(db, "articles"));
-    querySnapshot.forEach((docSnap) => {
-      articlesList.push(docSnap.data());
-    });
-  } catch (err) {
-    articlesList = DEFAULT_NEWS;
-  }
-  if (!articlesList || articlesList.length === 0) {
-    articlesList = DEFAULT_NEWS;
-  }
+  const articlesList = await fetchArticlesFromFirestoreWithTimeout(2500);
 
   articlesList.sort((a, b) => {
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const timeA = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return timeB - timeA;
   });
 
@@ -3166,15 +3161,16 @@ async function generateRssFeedXml(): Promise<string> {
     if (!art || !art.id) continue;
     const pubDate = art.createdAt ? new Date(art.createdAt).toUTCString() : new Date().toUTCString();
     const artUrl = `${baseUrl}/?article=${encodeURIComponent(art.id)}`;
+    const descriptionText = art.subtitle || (typeof art.content === "string" ? art.content.substring(0, 200) : "");
     xml += `    <item>\n`;
     xml += `      <title>${escapeXml(art.title)}</title>\n`;
     xml += `      <link>${artUrl}</link>\n`;
     xml += `      <guid isPermaLink="true">${artUrl}</guid>\n`;
-    xml += `      <description>${escapeXml(art.subtitle || art.content.substring(0, 200))}</description>\n`;
+    xml += `      <description>${escapeXml(descriptionText)}</description>\n`;
     xml += `      <pubDate>${pubDate}</pubDate>\n`;
     xml += `      <dc:creator>${escapeXml(art.author || "सम्पादकीय टीम")}</dc:creator>\n`;
     xml += `      <category>${escapeXml(art.category || "General")}</category>\n`;
-    if (art.image) {
+    if (art.image && typeof art.image === "string" && art.image.trim().length > 0) {
       xml += `      <enclosure url="${escapeXml(art.image)}" length="102400" type="image/jpeg" />\n`;
     }
     xml += `    </item>\n`;

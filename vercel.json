@@ -9,6 +9,10 @@
       "destination": "/api"
     },
     {
+      "source": "/news-sitemap.xml",
+      "destination": "/api"
+    },
+    {
       "source": "/sitemap-index.xml",
       "destination": "/api"
     },
@@ -17,11 +21,19 @@
       "destination": "/api"
     },
     {
+      "source": "/ads.txt",
+      "destination": "/api"
+    },
+    {
       "source": "/rss.xml",
       "destination": "/api"
     },
     {
-      "source": "/((?!api/|sitemap|robots|rss).*)",
+      "source": "/feed.xml",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/|sitemap|news-sitemap|robots|ads|rss|feed).*)",
       "destination": "/index.html"
     }
   ]
