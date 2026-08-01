@@ -1,4 +1,4 @@
-import { Article, CategoryKey, Comment } from "../types";
+import { Article, CategoryKey, Comment, SiteSettings, AuthorProfileData } from "../types";
 import { FALLBACK_NEWS } from "../data/fallbackNews";
 import { db, auth } from "./firebase";
 import {
@@ -12,6 +12,7 @@ import {
   arrayUnion,
   increment
 } from "firebase/firestore";
+
 
 export async function fetchNewsList(
   category: CategoryKey = "all",
@@ -274,3 +275,108 @@ export async function deleteArticleClient(id: string): Promise<boolean> {
     throw new Error("Firestore से खबर हटाने में विफलता: " + (err?.message || err));
   }
 }
+
+// Site Settings (Publisher Info & Contact Us)
+export async function fetchSiteSettingsClient(): Promise<SiteSettings> {
+  try {
+    const docSnap = await getDoc(doc(db, "settings", "site"));
+    if (docSnap.exists()) {
+      return docSnap.data() as SiteSettings;
+    }
+  } catch (err) {
+    console.warn("Firestore fetch site settings error:", err);
+  }
+  return {
+    publisherInfo: {
+      publisherName: "",
+      cinNumber: "",
+      chiefEditor: "",
+      address: "",
+      ownershipDetails: ""
+    },
+    contactUs: {
+      editorialEmail: "editor@saradesh.in",
+      supportEmail: "contact@saradesh.in",
+      phone: "",
+      address: ""
+    }
+  };
+}
+
+export async function saveSiteSettingsClient(settings: SiteSettings): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("केवल एडमिन ही साइट की सेटिंग सहेज सकते हैं।");
+  }
+  try {
+    await setDoc(doc(db, "settings", "site"), settings, { merge: true });
+    return true;
+  } catch (err: any) {
+    console.error("Firestore save site settings error:", err);
+    throw new Error("सेटिंग सहेजने में विफलता: " + (err?.message || err));
+  }
+}
+
+// Author Profiles Management
+export async function fetchAuthorProfilesClient(): Promise<AuthorProfileData[]> {
+  const profiles: AuthorProfileData[] = [];
+  try {
+    const querySnapshot = await getDocs(collection(db, "author_profiles"));
+    querySnapshot.forEach((docSnap) => {
+      if (docSnap.exists()) {
+        profiles.push({ id: docSnap.id, ...docSnap.data() } as AuthorProfileData);
+      }
+    });
+  } catch (err) {
+    console.warn("Firestore fetch author profiles error:", err);
+  }
+  return profiles;
+}
+
+export async function saveAuthorProfileClient(profile: AuthorProfileData): Promise<AuthorProfileData> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("केवल एडमिन ही लेखक प्रोफाइल सहेज सकते हैं।");
+  }
+
+  const cleanName = profile.name.trim();
+  if (!cleanName) {
+    throw new Error("लेखक का नाम आवश्यक है।");
+  }
+
+  // Generate document ID from profile ID or author name
+  const id = profile.id || cleanName.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "-");
+  const dataToSave: AuthorProfileData = {
+    id,
+    name: cleanName,
+    role: profile.role?.trim() || "",
+    bio: profile.bio?.trim() || "",
+    experience: profile.experience?.trim() || "",
+    avatar: profile.avatar || "",
+    badge: profile.badge?.trim() || "",
+    email: profile.email?.trim() || ""
+  };
+
+  try {
+    await setDoc(doc(db, "author_profiles", id), dataToSave, { merge: true });
+    return dataToSave;
+  } catch (err: any) {
+    console.error("Firestore save author profile error:", err);
+    throw new Error("लेखक प्रोफाइल सहेजने में विफलता: " + (err?.message || err));
+  }
+}
+
+export async function deleteAuthorProfileClient(profileId: string): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("केवल एडमिन ही प्रोफाइल हटा सकते हैं।");
+  }
+  try {
+    await deleteDoc(doc(db, "author_profiles", profileId));
+    return true;
+  } catch (err: any) {
+    console.error("Firestore delete author profile error:", err);
+    throw new Error("प्रोफाइल हटाने में विफलता: " + (err?.message || err));
+  }
+}
+

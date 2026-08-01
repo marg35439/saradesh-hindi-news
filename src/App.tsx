@@ -596,7 +596,7 @@ export default function App() {
               className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
             >
               <SEOHead
-                categoryName={selectedCategory !== "all" ? (CATEGORIES.find(c => c.key === selectedCategory)?.label || selectedCategory) : undefined}
+                categoryName={selectedCategory !== "all" ? (CATEGORIES.find(c => c.key === selectedCategory)?.hindiName || selectedCategory) : undefined}
               />
               
               {/* PRIMARY CONTENT BLOCK: Center & Left feed */}

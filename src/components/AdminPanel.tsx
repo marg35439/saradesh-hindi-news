@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon, UserCheck } from "lucide-react";
+import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon, UserCheck, Building, Mail, Phone, MapPin, User as UserIcon, CheckCircle, ShieldCheck, Award } from "lucide-react";
 import { motion } from "motion/react";
-import { Article, CATEGORIES, STATES } from "../types";
-import { fetchNewsList, saveArticleClient, deleteArticleClient } from "../lib/newsClient";
+import { Article, CATEGORIES, STATES, SiteSettings, AuthorProfileData } from "../types";
+import { fetchNewsList, saveArticleClient, deleteArticleClient, fetchSiteSettingsClient, saveSiteSettingsClient, fetchAuthorProfilesClient, saveAuthorProfileClient, deleteAuthorProfileClient } from "../lib/newsClient";
+
 import {
   auth,
   getUserRoleProfile,
@@ -273,7 +274,58 @@ export default function AdminPanel() {
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch" | "users">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "create" | "insights" | "login" | "compiler" | "urlScraper" | "screenshot" | "batch" | "users" | "siteSettings">("list");
+
+  // Site Settings & Author Profiles states
+  const [pubName, setPubName] = useState("");
+  const [pubCin, setPubCin] = useState("");
+  const [pubChiefEditor, setPubChiefEditor] = useState("");
+  const [pubAddress, setPubAddress] = useState("");
+  const [pubOwnership, setPubOwnership] = useState("");
+
+  const [conEditorialEmail, setConEditorialEmail] = useState("editor@saradesh.in");
+  const [conSupportEmail, setConSupportEmail] = useState("contact@saradesh.in");
+  const [conPhone, setConPhone] = useState("");
+  const [conAddress, setConAddress] = useState("");
+
+  const [authorProfilesList, setAuthorProfilesList] = useState<AuthorProfileData[]>([]);
+  const [editingAuthorId, setEditingAuthorId] = useState<string | null>(null);
+  const [authorFormName, setAuthorFormName] = useState("");
+  const [authorFormRole, setAuthorFormRole] = useState("");
+  const [authorFormBio, setAuthorFormBio] = useState("");
+  const [authorFormExperience, setAuthorFormExperience] = useState("");
+  const [authorFormAvatar, setAuthorFormAvatar] = useState("");
+  const [authorFormBadge, setAuthorFormBadge] = useState("");
+  const [authorFormEmail, setAuthorFormEmail] = useState("");
+
+  const [siteSettingsMsg, setSiteSettingsMsg] = useState("");
+  const [siteSettingsError, setSiteSettingsError] = useState("");
+  const [savingSiteSettings, setSavingSiteSettings] = useState(false);
+
+  const loadSiteSettingsData = async () => {
+    try {
+      const settings = await fetchSiteSettingsClient();
+      if (settings.publisherInfo) {
+        setPubName(settings.publisherInfo.publisherName || "");
+        setPubCin(settings.publisherInfo.cinNumber || "");
+        setPubChiefEditor(settings.publisherInfo.chiefEditor || "");
+        setPubAddress(settings.publisherInfo.address || "");
+        setPubOwnership(settings.publisherInfo.ownershipDetails || "");
+      }
+      if (settings.contactUs) {
+        setConEditorialEmail(settings.contactUs.editorialEmail || "");
+        setConSupportEmail(settings.contactUs.supportEmail || "");
+        setConPhone(settings.contactUs.phone || "");
+        setConAddress(settings.contactUs.address || "");
+      }
+
+      const profiles = await fetchAuthorProfilesClient();
+      setAuthorProfilesList(profiles);
+    } catch (err) {
+      console.error("Error loading site settings:", err);
+    }
+  };
+
 
   const isAuthenticated = !!currentUser;
 
@@ -325,6 +377,119 @@ export default function AdminPanel() {
       loadUsersList();
     }
   }, [activeTab, userProfile]);
+
+  useEffect(() => {
+    if (activeTab === "siteSettings") {
+      loadSiteSettingsData();
+    }
+  }, [activeTab]);
+
+  const handleSavePublisherAndContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSiteSettings(true);
+    setSiteSettingsMsg("");
+    setSiteSettingsError("");
+    try {
+      await saveSiteSettingsClient({
+        publisherInfo: {
+          publisherName: pubName,
+          cinNumber: pubCin,
+          chiefEditor: pubChiefEditor,
+          address: pubAddress,
+          ownershipDetails: pubOwnership,
+        },
+        contactUs: {
+          editorialEmail: conEditorialEmail,
+          supportEmail: conSupportEmail,
+          phone: conPhone,
+          address: conAddress,
+        },
+      });
+      setSiteSettingsMsg("प्रकाशक व संपर्क जानकारी सफलतापूर्वक अद्यतन (Save) कर दी गई है!");
+    } catch (err: any) {
+      console.error(err);
+      setSiteSettingsError(err.message || "जानकारी सहेजने में त्रुटि आई।");
+    } finally {
+      setSavingSiteSettings(false);
+    }
+  };
+
+  const handleSaveAuthorProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorFormName.trim()) {
+      setSiteSettingsError("लेखक का नाम आवश्यक है।");
+      return;
+    }
+    setSavingSiteSettings(true);
+    setSiteSettingsMsg("");
+    setSiteSettingsError("");
+    try {
+      const saved = await saveAuthorProfileClient({
+        id: editingAuthorId || undefined,
+        name: authorFormName,
+        role: authorFormRole,
+        bio: authorFormBio,
+        experience: authorFormExperience,
+        avatar: authorFormAvatar,
+        badge: authorFormBadge,
+        email: authorFormEmail,
+      });
+
+      setSiteSettingsMsg(`लेखक '${saved.name}' का प्रोफाइल सफलतापूर्वक सहेजा गया!`);
+      // Reset form
+      setEditingAuthorId(null);
+      setAuthorFormName("");
+      setAuthorFormRole("");
+      setAuthorFormBio("");
+      setAuthorFormExperience("");
+      setAuthorFormAvatar("");
+      setAuthorFormBadge("");
+      setAuthorFormEmail("");
+
+      // Refresh list
+      const updated = await fetchAuthorProfilesClient();
+      setAuthorProfilesList(updated);
+    } catch (err: any) {
+      console.error(err);
+      setSiteSettingsError(err.message || "लेखक प्रोफाइल सहेजने में विफलता।");
+    } finally {
+      setSavingSiteSettings(false);
+    }
+  };
+
+  const handleEditAuthorProfile = (prof: AuthorProfileData) => {
+    setEditingAuthorId(prof.id || null);
+    setAuthorFormName(prof.name || "");
+    setAuthorFormRole(prof.role || "");
+    setAuthorFormBio(prof.bio || "");
+    setAuthorFormExperience(prof.experience || "");
+    setAuthorFormAvatar(prof.avatar || "");
+    setAuthorFormBadge(prof.badge || "");
+    setAuthorFormEmail(prof.email || "");
+  };
+
+  const handleDeleteAuthorProfile = async (id: string, name: string) => {
+    if (!confirm(`क्या आप सचमुच ${name} का ऑथर प्रोफाइल हटाना चाहते हैं?`)) return;
+    try {
+      await deleteAuthorProfileClient(id);
+      const updated = await fetchAuthorProfilesClient();
+      setAuthorProfilesList(updated);
+      setSiteSettingsMsg(`लेखक '${name}' का प्रोफाइल हटा दिया गया।`);
+    } catch (err: any) {
+      console.error(err);
+      setSiteSettingsError(err.message || "हटाने में विफलता।");
+    }
+  };
+
+  const handleAuthorPhotoUpload = async (file: File) => {
+    try {
+      const compressed = await compressImageFile(file, 600, 0.8);
+      setAuthorFormAvatar(compressed);
+    } catch (err) {
+      console.error("Image upload error:", err);
+    }
+  };
+
   
   // Bulk Batch Importer & Photo Matcher States
   const [batchNewsText, setBatchNewsText] = useState("");
@@ -1209,6 +1374,17 @@ export default function AdminPanel() {
         >
           📸 स्क्रीनशॉट से समाचार एआई
         </button>
+        <button
+          onClick={() => setActiveTab("siteSettings")}
+          className={`px-5 py-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === "siteSettings"
+              ? "border-[#ff6f00] text-[#ff6f00]"
+              : "border-transparent text-neutral-500 hover:text-neutral-800"
+          }`}
+        >
+          🏢 प्रकाशक, संपर्क व ऑथर प्रोफाइल
+        </button>
+
 
         {userProfile?.role === "super_admin" && (
           <button
@@ -3154,6 +3330,372 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+
+      {/* TAB CONTENT: SITE SETTINGS & AUTHOR PROFILES */}
+      {activeTab === "siteSettings" && (
+        <div className="space-y-8">
+          {/* Status Messages */}
+          {siteSettingsMsg && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-sm font-bold flex items-center justify-between">
+              <span>{siteSettingsMsg}</span>
+              <button onClick={() => setSiteSettingsMsg("")} className="text-xs text-emerald-600 underline cursor-pointer">बंद करें</button>
+            </div>
+          )}
+          {siteSettingsError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-bold flex items-center justify-between">
+              <span>{siteSettingsError}</span>
+              <button onClick={() => setSiteSettingsError("")} className="text-xs text-red-500 underline cursor-pointer">बंद करें</button>
+            </div>
+          )}
+
+          {/* SECTION 1 & 2: PUBLISHER INFO & CONTACT US FORM */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-6 md:p-8 shadow-sm">
+            <div className="flex items-center gap-2 mb-6 border-b border-neutral-200 pb-3">
+              <Building className="w-6 h-6 text-[#ff6f00]" />
+              <h2 className="text-xl font-black text-neutral-900">1. प्रकाशक एवं संपर्क जानकारी प्रबंधन (Publisher & Contact Info)</h2>
+            </div>
+
+            <form onSubmit={handleSavePublisherAndContact} className="space-y-6">
+              {/* Publisher Sub-block */}
+              <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-200/80 space-y-4">
+                <h3 className="text-sm font-black text-amber-900 uppercase tracking-wider flex items-center gap-2">
+                  <Building className="w-4 h-4 text-[#ff6f00]" />
+                  <span>प्रकाशक एवं स्वामित्व विवरण (Publisher Information)</span>
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  नोट: इस ब्लॉक में जानकारी खाली (blank) छोड़ने पर फ्रंटएंड 'प्रकाशक जानकारी' पेज पर भी कोई गलत डेटा नहीं दिखेगा।
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">प्रकाशक संस्था का नाम (Publisher Company Name):</label>
+                    <input
+                      type="text"
+                      placeholder="उदा: सारादेश मीडिया प्राइवेट लिमिटेड (या खाली छोड़ें)"
+                      value={pubName}
+                      onChange={(e) => setPubName(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">कॉरपोरेट पहचान / पंजीयन संख्या (CIN Number):</label>
+                    <input
+                      type="text"
+                      placeholder="उदा: U92100DL2026PTC384912 (या खाली छोड़ें)"
+                      value={pubCin}
+                      onChange={(e) => setPubCin(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">प्रधान संपादक / प्रबंध निदेशक का नाम:</label>
+                    <input
+                      type="text"
+                      placeholder="संपादक / निदेशक का नाम (या खाली छोड़ें)"
+                      value={pubChiefEditor}
+                      onChange={(e) => setPubChiefEditor(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">मुख्यालय / कार्यालय पता:</label>
+                    <input
+                      type="text"
+                      placeholder="मुख्यालय का सही पता"
+                      value={pubAddress}
+                      onChange={(e) => setPubAddress(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">स्वामित्व एवं वित्तीय विवरण (Ownership Note):</label>
+                  <textarea
+                    rows={2}
+                    placeholder="स्वामित्व या वित्तीय विवरण (या खाली छोड़ें)"
+                    value={pubOwnership}
+                    onChange={(e) => setPubOwnership(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+              </div>
+
+              {/* Contact Us Sub-block */}
+              <div className="bg-neutral-50 p-5 rounded-xl border border-neutral-200 space-y-4">
+                <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wider flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-[#ff6f00]" />
+                  <span>संपर्क जानकारी (Contact Us Details)</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">संपादकीय ईमेल (Editorial Email):</label>
+                    <input
+                      type="email"
+                      placeholder="editor@saradesh.in"
+                      value={conEditorialEmail}
+                      onChange={(e) => setConEditorialEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">सपोर्ट / अन्य ईमेल (Support Email):</label>
+                    <input
+                      type="email"
+                      placeholder="contact@saradesh.in"
+                      value={conSupportEmail}
+                      onChange={(e) => setConSupportEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">संपर्क / हेल्पलाइन नंबर (Phone):</label>
+                    <input
+                      type="text"
+                      placeholder="हेल्पलाइन या फ़ोन नंबर (या खाली छोड़ें)"
+                      value={conPhone}
+                      onChange={(e) => setConPhone(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 mb-1">कार्यालय का पता (Office Address):</label>
+                    <input
+                      type="text"
+                      placeholder="संपर्क का सही पता (या खाली छोड़ें)"
+                      value={conAddress}
+                      onChange={(e) => setConAddress(e.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingSiteSettings}
+                  className="px-6 py-3 bg-[#ff6f00] hover:bg-amber-600 text-white font-black rounded-xl text-sm transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingSiteSettings ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>प्रकाशक व संपर्क जानकारी सेव करें</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* SECTION 3: AUTHOR PROFILES MANAGEMENT BLOCK */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-neutral-200 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <UserIcon className="w-6 h-6 text-[#ff6f00]" />
+                <h2 className="text-xl font-black text-neutral-900">2. लेखक एवं रिपोर्टर प्रोफाइल ब्लॉक (Author Profiles Block)</h2>
+              </div>
+              {editingAuthorId && (
+                <button
+                  onClick={() => {
+                    setEditingAuthorId(null);
+                    setAuthorFormName("");
+                    setAuthorFormRole("");
+                    setAuthorFormBio("");
+                    setAuthorFormExperience("");
+                    setAuthorFormAvatar("");
+                    setAuthorFormBadge("");
+                    setAuthorFormEmail("");
+                  }}
+                  className="text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-amber-100"
+                >
+                  + नया ऑथर प्रोफाइल जोड़ें
+                </button>
+              )}
+            </div>
+
+            {/* Existing Author Profiles List */}
+            <div>
+              <h3 className="text-sm font-extrabold text-neutral-800 mb-3">वर्तमान में सहेजे गए लेखक प्रोफ़ाइल ({authorProfilesList.length}):</h3>
+              {authorProfilesList.length === 0 ? (
+                <div className="bg-neutral-50 p-6 rounded-xl border border-neutral-200 text-center text-xs text-neutral-500">
+                  अभी तक कोई ऑथर प्रोफाइल नहीं जोड़ा गया है। नीचे दिए फॉर्म से लेखक का नाम, फोटो, बायो और अनुभव भरें।
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {authorProfilesList.map((prof) => (
+                    <div
+                      key={prof.id || prof.name}
+                      className="p-4 border border-neutral-200 rounded-xl bg-neutral-50 hover:bg-white transition-all flex gap-3 items-start"
+                    >
+                      {prof.avatar ? (
+                        <img
+                          src={prof.avatar}
+                          alt={prof.name}
+                          className="w-14 h-14 rounded-full object-cover border-2 border-amber-500 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-800 font-black text-lg flex items-center justify-center shrink-0 border-2 border-amber-500">
+                          {prof.name.substring(0, 1)}
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-sm text-neutral-900 truncate">{prof.name}</h4>
+                        {prof.role && <p className="text-xs text-amber-700 font-semibold truncate">{prof.role}</p>}
+                        {prof.experience && <p className="text-[11px] text-neutral-500">अनुभव: {prof.experience}</p>}
+                        {prof.bio && <p className="text-[11px] text-neutral-600 line-clamp-2 mt-1">{prof.bio}</p>}
+
+                        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-neutral-200">
+                          <button
+                            onClick={() => handleEditAuthorProfile(prof)}
+                            className="text-[11px] font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg cursor-pointer flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>संपादित करें</span>
+                          </button>
+                          {prof.id && (
+                            <button
+                              onClick={() => handleDeleteAuthorProfile(prof.id!, prof.name)}
+                              className="text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg cursor-pointer flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>हटाएं</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Author Profile Form */}
+            <form onSubmit={handleSaveAuthorProfile} className="bg-amber-50/40 p-6 rounded-2xl border border-amber-200/80 space-y-4">
+              <h3 className="text-base font-black text-amber-900 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-[#ff6f00]" />
+                <span>{editingAuthorId ? `ऑथर प्रोफाइल संपादित करें ('${authorFormName}')` : "नया ऑथर प्रोफाइल दर्ज करें"}</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">लेखक का पूरा नाम (Author Name) *:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="उदा: अमित कुमार शर्मा"
+                    value={authorFormName}
+                    onChange={(e) => setAuthorFormName(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">पद / पदनाम (Role / Designation):</label>
+                  <input
+                    type="text"
+                    placeholder="उदा: वरिष्ठ राजनीतिक एवं राष्ट्रीय ब्यूरो प्रमुख"
+                    value={authorFormRole}
+                    onChange={(e) => setAuthorFormRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">अनुभव (Experience):</label>
+                  <input
+                    type="text"
+                    placeholder="उदा: 8+ वर्ष (या खाली छोड़ें)"
+                    value={authorFormExperience}
+                    onChange={(e) => setAuthorFormExperience(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">सत्यापन टैग (Badge):</label>
+                  <input
+                    type="text"
+                    placeholder="उदा: सत्यापित मुख्य पत्रकार"
+                    value={authorFormBadge}
+                    onChange={(e) => setAuthorFormBadge(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">ऑथर ईमेल (Author Email):</label>
+                  <input
+                    type="email"
+                    placeholder="उदा: reporter@saradesh.in"
+                    value={authorFormEmail}
+                    onChange={(e) => setAuthorFormEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+
+                {/* Author Photo Upload & URL */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-neutral-700">ऑथर की फोटो (Upload / Image URL):</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAuthorPhotoUpload(file);
+                      }}
+                      className="text-xs text-neutral-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="या फोटो का डायरेक्ट URL यहाँ पेस्ट करें..."
+                    value={authorFormAvatar}
+                    onChange={(e) => setAuthorFormAvatar(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-neutral-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#ff6f00]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">लेखक का परिचय एवं जीवनी (Biography):</label>
+                <textarea
+                  rows={3}
+                  placeholder="लेखक की संक्षिप्त जीवनी दर्ज करें..."
+                  value={authorFormBio}
+                  onChange={(e) => setAuthorFormBio(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
+                />
+              </div>
+
+              {/* Live Preview of Photo */}
+              {authorFormAvatar && (
+                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-neutral-200">
+                  <img src={authorFormAvatar} alt="Preview" className="w-12 h-12 rounded-full object-cover border-2 border-amber-500" />
+                  <span className="text-xs text-emerald-700 font-bold">✓ फोटो प्रीव्यू तैयार है!</span>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={savingSiteSettings}
+                  className="px-6 py-2.5 bg-neutral-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {savingSiteSettings ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>{editingAuthorId ? "ऑथर प्रोफाइल अपडेट करें" : "ऑथर प्रोफाइल सहेजें"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
 
     </div>
   );

@@ -70,3 +70,35 @@ export const STATES = [
   'पश्चिम बंगाल',
   'जम्मू-कश्मीर'
 ];
+
+export interface PublisherInfoSettings {
+  publisherName?: string;
+  cinNumber?: string;
+  chiefEditor?: string;
+  address?: string;
+  ownershipDetails?: string;
+}
+
+export interface ContactUsSettings {
+  editorialEmail?: string;
+  supportEmail?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface AuthorProfileData {
+  id?: string;
+  name: string;
+  role?: string;
+  bio?: string;
+  experience?: string;
+  avatar?: string;
+  badge?: string;
+  email?: string;
+}
+
+export interface SiteSettings {
+  publisherInfo?: PublisherInfoSettings;
+  contactUs?: ContactUsSettings;
+}
+

@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ArrowLeft, ShieldCheck, Scale, CheckSquare, Building, Mail, Phone, MapPin, Send, AlertCircle, FileText } from "lucide-react";
+import { fetchSiteSettingsClient } from "../lib/newsClient";
+import { SiteSettings } from "../types";
 
 interface PolicyPagesProps {
   pageType: "editorial-policy" | "corrections-policy" | "fact-check-policy" | "publisher-info" | "about-us" | "contact-us";
@@ -9,15 +11,26 @@ interface PolicyPagesProps {
 export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) => {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", subject: "", message: "" });
+  const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+
+  useEffect(() => {
+    fetchSiteSettingsClient().then((s) => setSiteSettings(s));
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormSubmitted(true);
   };
 
+  const pub = siteSettings?.publisherInfo;
+  const con = siteSettings?.contactUs;
+
+  const hasPubInfo = pub && (pub.publisherName || pub.cinNumber || pub.chiefEditor || pub.address || pub.ownershipDetails);
+
   const renderContent = () => {
     switch (pageType) {
       case "editorial-policy":
+
         return (
           <div className="space-y-6">
             <div className="flex items-center gap-3 text-amber-700 mb-2">
@@ -125,27 +138,50 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
               <h1 className="text-2xl md:text-3xl font-black text-neutral-900">प्रकाशक एवं स्वामित्व जानकारी (Publisher Information)</h1>
             </div>
             <p className="text-sm text-neutral-500 font-medium border-b border-neutral-200 pb-3">
-              कंपनी पंजीकरण, स्वामित्व और वित्तीय पारदर्शिता
+              कंपनी पंजीकरण, स्वामित्व और पारदर्शी विवरण
             </p>
 
-            <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200 space-y-4 text-sm">
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-neutral-500 font-bold">प्रकाशक संस्था:</span>
-                <span className="font-bold text-neutral-900">सारादेश समाचार प्राइवेट लिमिटेड (Saradesh News Pvt. Ltd.)</span>
+            {hasPubInfo ? (
+              <div className="bg-neutral-50 p-6 rounded-2xl border border-neutral-200 space-y-4 text-sm">
+                {pub?.publisherName && (
+                  <div className="flex flex-col sm:flex-row justify-between border-b pb-2 gap-1">
+                    <span className="text-neutral-500 font-bold">प्रकाशक संस्था:</span>
+                    <span className="font-bold text-neutral-900">{pub.publisherName}</span>
+                  </div>
+                )}
+                {pub?.cinNumber && (
+                  <div className="flex flex-col sm:flex-row justify-between border-b pb-2 gap-1">
+                    <span className="text-neutral-500 font-bold">कॉरपोरेट पहचान / पंजीयन संख्या (CIN):</span>
+                    <span className="font-bold text-neutral-900">{pub.cinNumber}</span>
+                  </div>
+                )}
+                {pub?.chiefEditor && (
+                  <div className="flex flex-col sm:flex-row justify-between border-b pb-2 gap-1">
+                    <span className="text-neutral-500 font-bold">प्रधान संपादक / निदेशक:</span>
+                    <span className="font-bold text-neutral-900">{pub.chiefEditor}</span>
+                  </div>
+                )}
+                {pub?.address && (
+                  <div className="flex flex-col sm:flex-row justify-between border-b pb-2 gap-1">
+                    <span className="text-neutral-500 font-bold">मुख्यालय / कार्यालय पता:</span>
+                    <span className="font-bold text-neutral-900">{pub.address}</span>
+                  </div>
+                )}
+                {pub?.ownershipDetails && (
+                  <div className="flex flex-col sm:flex-row justify-between pt-1 gap-1">
+                    <span className="text-neutral-500 font-bold">स्वामित्व व वित्तीय विवरण:</span>
+                    <span className="font-semibold text-neutral-800">{pub.ownershipDetails}</span>
+                  </div>
+                )}
               </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-neutral-500 font-bold">कॉरपोरेट पहचान संख्या (CIN):</span>
-                <span className="font-bold text-neutral-900">U92100DL2026PTC384912</span>
+            ) : (
+              <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-8 text-center text-neutral-600 space-y-2">
+                <p className="font-bold text-amber-900 text-base">प्रकाशक जानकारी वर्तमान में खाली (blank) है।</p>
+                <p className="text-xs text-neutral-500">
+                  एडमिन पैनल के <strong>"साइट व ऑथर सेटिंग्स"</strong> ब्लॉक से प्रकाशक संस्था, CIN व संपादक विवरण दर्ज करने पर वह स्वतः यहाँ प्रदर्शित होगा।
+                </p>
               </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-neutral-500 font-bold">प्रधान संपादक एवं निदेशक:</span>
-                <span className="font-bold text-neutral-900">अमित कुमार शर्मा</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-neutral-500 font-bold">मुख्यालय:</span>
-                <span className="font-bold text-neutral-900">आई.टी.ओ. प्रेस एनक्लेव, नई दिल्ली - 110002</span>
-              </div>
-            </div>
+            )}
           </div>
         );
 
@@ -183,14 +219,31 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
               <div className="space-y-4">
                 <div className="flex items-start gap-3 bg-amber-50/80 p-5 rounded-2xl border border-amber-200/80 shadow-2xs">
                   <Mail className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
+                  <div className="space-y-1">
                     <span className="font-bold text-xs uppercase text-amber-800 tracking-wider block mb-1">संपादकीय एवं आधिकारिक ईमेल (Official Email):</span>
-                    <p className="text-sm text-neutral-900 font-bold">editor@saradesh.in</p>
-                    <p className="text-sm text-neutral-800 font-semibold mt-0.5">contact@saradesh.in</p>
+                    {con?.editorialEmail && (
+                      <p className="text-sm text-neutral-900 font-bold">{con.editorialEmail}</p>
+                    )}
+                    {con?.supportEmail && (
+                      <p className="text-sm text-neutral-800 font-semibold">{con.supportEmail}</p>
+                    )}
+                    {con?.phone && (
+                      <p className="text-sm text-neutral-800 font-semibold pt-1 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{con.phone}</span>
+                      </p>
+                    )}
+                    {con?.address && (
+                      <p className="text-xs text-neutral-700 pt-1 flex items-start gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>{con.address}</span>
+                      </p>
+                    )}
                     <p className="text-xs text-neutral-500 mt-2">किसी भी समाचार, विज्ञापन या प्रतिक्रिया के लिए हमें ईमेल करें। हमारी टीम 24 घंटे के भीतर जवाब देती है।</p>
                   </div>
                 </div>
               </div>
+
 
               {/* Feedback Form */}
               <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
