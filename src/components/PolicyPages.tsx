@@ -181,27 +181,13 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <div className="flex items-start gap-3 bg-neutral-50 p-4 rounded-xl border">
-                  <MapPin className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 bg-amber-50/80 p-5 rounded-2xl border border-amber-200/80 shadow-2xs">
+                  <Mail className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-xs uppercase text-neutral-500 block">मुख्य कार्यालय:</span>
-                    <p className="text-sm text-neutral-800 font-semibold">सारादेश समाचार प्रा. लि., प्रेस एनक्लेव, आई.टी.ओ., नई दिल्ली - 110002</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-neutral-50 p-4 rounded-xl border">
-                  <Mail className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-xs uppercase text-neutral-500 block">संपादकीय डेस्क:</span>
-                    <p className="text-sm text-neutral-800 font-semibold">editor@saradesh.in | contact@saradesh.in</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-neutral-50 p-4 rounded-xl border">
-                  <Phone className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-xs uppercase text-neutral-500 block">फोन व हेल्पलाइन:</span>
-                    <p className="text-sm text-neutral-800 font-semibold">+91 (011) 2341-8900</p>
+                    <span className="font-bold text-xs uppercase text-amber-800 tracking-wider block mb-1">संपादकीय एवं आधिकारिक ईमेल (Official Email):</span>
+                    <p className="text-sm text-neutral-900 font-bold">editor@saradesh.in</p>
+                    <p className="text-sm text-neutral-800 font-semibold mt-0.5">contact@saradesh.in</p>
+                    <p className="text-xs text-neutral-500 mt-2">किसी भी समाचार, विज्ञापन या प्रतिक्रिया के लिए हमें ईमेल करें। हमारी टीम 24 घंटे के भीतर जवाब देती है।</p>
                   </div>
                 </div>
               </div>
