@@ -68,23 +68,45 @@ export async function fetchNewsList(
     return timeB - timeA;
   });
 
-  // Category filter
+  // Category & State filtering
   if (category && category !== "all") {
     if (category === "state") {
+      items = items.filter((a) => a.category === "state" || !!a.state);
       if (state && state !== "सभी राज्य") {
+        const cleanState = state.trim();
         items = items.filter(
           (a) =>
-            a.category === "state" ||
-            a.content.includes(state) ||
-            a.title.includes(state) ||
-            a.subtitle?.includes(state)
+            a.state === cleanState ||
+            a.title.includes(cleanState) ||
+            (a.subtitle && a.subtitle.includes(cleanState)) ||
+            (a.content && a.content.includes(cleanState)) ||
+            (a.tags && a.tags.some((t) => t.includes(cleanState)))
         );
-      } else {
-        items = items.filter((a) => a.category === "state");
       }
     } else {
       items = items.filter((a) => a.category === category);
+      if (state && state !== "सभी राज्य") {
+        const cleanState = state.trim();
+        items = items.filter(
+          (a) =>
+            a.state === cleanState ||
+            a.title.includes(cleanState) ||
+            (a.subtitle && a.subtitle.includes(cleanState)) ||
+            (a.content && a.content.includes(cleanState)) ||
+            (a.tags && a.tags.some((t) => t.includes(cleanState)))
+        );
+      }
     }
+  } else if (state && state !== "सभी राज्य") {
+    const cleanState = state.trim();
+    items = items.filter(
+      (a) =>
+        a.state === cleanState ||
+        a.title.includes(cleanState) ||
+        (a.subtitle && a.subtitle.includes(cleanState)) ||
+        (a.content && a.content.includes(cleanState)) ||
+        (a.tags && a.tags.some((t) => t.includes(cleanState)))
+    );
   }
 
   // Search filter

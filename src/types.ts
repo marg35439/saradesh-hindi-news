@@ -27,7 +27,7 @@ export interface Article {
   createdAt?: string;
 }
 
-export type CategoryKey = 'all' | 'national' | 'international' | 'state' | 'sports' | 'entertainment' | 'business' | 'tech' | 'lifestyle' | 'job' | 'education' | 'religion' | 'astrology' | 'schemes';
+export type CategoryKey = 'all' | 'national' | 'international' | 'state' | 'crime' | 'sports' | 'entertainment' | 'business' | 'tech' | 'lifestyle' | 'job' | 'education' | 'religion' | 'astrology' | 'schemes';
 
 export interface CategoryInfo {
   key: CategoryKey;
@@ -38,6 +38,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { key: 'all', hindiName: 'होम' },
   { key: 'national', hindiName: 'देश' },
   { key: 'state', hindiName: 'राज्य' },
+  { key: 'crime', hindiName: 'क्राइम / अपराध' },
   { key: 'sports', hindiName: 'खेल' },
   { key: 'entertainment', hindiName: 'मनोरंजन' },
   { key: 'business', hindiName: 'बिजनेस' },

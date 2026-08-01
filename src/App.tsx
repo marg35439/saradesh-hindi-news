@@ -276,6 +276,7 @@ export default function App() {
   };
 
   const handleStateSelect = (state: string) => {
+    setSelectedCategory("state");
     setSelectedState(state);
     setSelectedArticleId(null);
   };
@@ -316,6 +317,7 @@ export default function App() {
   const categorySections = [
     { key: "national", hindiName: "देश (National)" },
     { key: "state", hindiName: "राज्य समाचार (State)" },
+    { key: "crime", hindiName: "क्राइम वर्ल्ड / अपराध (Crime World)" },
     { key: "sports", hindiName: "खेल जगत (Sports)" },
     { key: "entertainment", hindiName: "मनोरंजन (Entertainment)" },
     { key: "business", hindiName: "बिजनेस (Business)" },
@@ -1181,6 +1183,7 @@ export default function App() {
                 { id: "all", label: "सभी समाचार" },
                 { id: "national", label: "देश" },
                 { id: "state", label: "राज्य" },
+                { id: "crime", label: "क्राइम / अपराध" },
                 { id: "entertainment", label: "मनोरंजन" },
                 { id: "sports", label: "खेल" },
                 { id: "business", label: "बिजनेस" },

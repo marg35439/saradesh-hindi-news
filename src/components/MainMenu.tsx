@@ -40,6 +40,7 @@ export default function MainMenu({
                   case "all": return "bg-gradient-to-r from-orange-600 via-amber-500 to-amber-600 text-white shadow-md shadow-orange-500/20";
                   case "national": return "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-500/20";
                   case "state": return "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20";
+                  case "crime": return "bg-gradient-to-r from-rose-800 via-red-900 to-stone-900 text-white shadow-md shadow-rose-900/30";
                   case "sports": return "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20";
                   case "entertainment": return "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20";
                   case "business": return "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20";
@@ -57,6 +58,7 @@ export default function MainMenu({
                 switch (key) {
                   case "national": return "border-l-4 border-l-red-600 text-red-950 hover:bg-red-50";
                   case "state": return "border-l-4 border-l-amber-500 text-amber-950 hover:bg-amber-50";
+                  case "crime": return "border-l-4 border-l-rose-800 text-rose-950 hover:bg-rose-50";
                   case "sports": return "border-l-4 border-l-emerald-600 text-emerald-950 hover:bg-emerald-50";
                   case "entertainment": return "border-l-4 border-l-purple-600 text-purple-950 hover:bg-purple-50";
                   case "business": return "border-l-4 border-l-blue-600 text-blue-950 hover:bg-blue-50";
