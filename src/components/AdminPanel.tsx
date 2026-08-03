@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, BarChart2, Eye, Heart, MessageSquare, Lock, Unlock, LogOut, Upload, Clipboard, Image as ImageIcon, UserCheck, Building, Mail, Phone, MapPin, User as UserIcon, CheckCircle, ShieldCheck, Award } from "lucide-react";
 import { motion } from "motion/react";
-import { Article, CATEGORIES, STATES, SiteSettings, AuthorProfileData } from "../types";
+import { Article, CATEGORIES, STATES, SUBCATEGORIES, PRESET_DESKS, SiteSettings, AuthorProfileData } from "../types";
 import { fetchNewsList, saveArticleClient, deleteArticleClient, fetchSiteSettingsClient, saveSiteSettingsClient, fetchAuthorProfilesClient, saveAuthorProfileClient, deleteAuthorProfileClient } from "../lib/newsClient";
 
 import {
@@ -526,9 +526,13 @@ export default function AdminPanel() {
   const [subtitle, setSubtitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("national");
+  const [subcategory, setSubcategory] = useState("");
+  const [customSubcategory, setCustomSubcategory] = useState("");
   const [stateName, setStateName] = useState("");
   const [image, setImage] = useState("");
-  const [author, setAuthor] = useState("");
+  const [selectedDesk, setSelectedDesk] = useState("नेशनल डेस्क");
+  const [author, setAuthor] = useState("नेशनल डेस्क");
+  const [customAuthor, setCustomAuthor] = useState("");
   const [tags, setTags] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [isBreaking, setIsBreaking] = useState(false);
@@ -1105,15 +1109,19 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
 
+    const effectiveSubcat = subcategory === "custom" ? customSubcategory.trim() : subcategory;
+    const effectiveAuthor = selectedDesk === "custom" ? customAuthor.trim() : (author || selectedDesk);
+
     const payload = {
       ...(editingId ? { id: editingId } : {}),
       title,
       subtitle,
       content,
       category,
+      subcategory: effectiveSubcat || undefined,
       state: stateName || undefined,
       image: image || undefined,
-      author,
+      author: effectiveAuthor,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
       metaDescription: metaDescription.trim() || undefined,
       isBreaking,
@@ -1138,12 +1146,36 @@ export default function AdminPanel() {
     setCategory(art.category);
     setStateName(art.state || "");
     setImage(art.image);
-    setAuthor(art.author);
     setTags(art.tags ? art.tags.join(", ") : "");
     setMetaDescription(art.metaDescription || "");
     setIsBreaking(!!art.isBreaking);
     setIsFeatured(!!art.isFeatured);
     setIsTrending(!!art.isTrending);
+
+    // Set subcategory
+    if (art.subcategory) {
+      if (SUBCATEGORIES.some(s => s.key === art.subcategory)) {
+        setSubcategory(art.subcategory);
+        setCustomSubcategory("");
+      } else {
+        setSubcategory("custom");
+        setCustomSubcategory(art.subcategory);
+      }
+    } else {
+      setSubcategory("");
+      setCustomSubcategory("");
+    }
+
+    // Set author / desk
+    if (art.author && PRESET_DESKS.includes(art.author)) {
+      setSelectedDesk(art.author);
+      setAuthor(art.author);
+      setCustomAuthor("");
+    } else {
+      setSelectedDesk("custom");
+      setCustomAuthor(art.author || "");
+      setAuthor(art.author || "");
+    }
     
     setActiveTab("create");
   };
@@ -1178,9 +1210,13 @@ export default function AdminPanel() {
     setSubtitle("");
     setContent("");
     setCategory("national");
+    setSubcategory("");
+    setCustomSubcategory("");
     setStateName("");
     setImage("");
-    setAuthor("");
+    setSelectedDesk("नेशनल डेस्क");
+    setAuthor("नेशनल डेस्क");
+    setCustomAuthor("");
     setTags("");
     setMetaDescription("");
     setIsBreaking(false);
@@ -1834,12 +1870,37 @@ export default function AdminPanel() {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
+                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-bold text-neutral-800"
                   >
                     {CATEGORIES.filter(c => c.key !== 'all').map((cat) => (
                       <option key={cat.key} value={cat.key}>{cat.hindiName}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Sub-Category Box */}
+                <div>
+                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">सब-कैटेगरी (Sub-Category) :</label>
+                  <select
+                    value={subcategory}
+                    onChange={(e) => setSubcategory(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-medium text-neutral-800"
+                  >
+                    <option value="">कोई सब-कैटेगरी नहीं (सामान्य)</option>
+                    {SUBCATEGORIES.map((sub) => (
+                      <option key={sub.key} value={sub.key}>{sub.hindiName}</option>
+                    ))}
+                    <option value="custom">✍️ अन्य (अपनी सब-कैटेगरी दर्ज करें)</option>
+                  </select>
+                  {subcategory === "custom" && (
+                    <input
+                      type="text"
+                      placeholder="अपनी सब-कैटेगरी का नाम लिखें (उदा: क्रिकेट, मोबाइल, ईवी)..."
+                      value={customSubcategory}
+                      onChange={(e) => setCustomSubcategory(e.target.value)}
+                      className="w-full text-xs p-2 mt-1.5 rounded-lg bg-white border border-amber-300 focus:border-[#ff6f00] outline-none"
+                    />
+                  )}
                 </div>
 
                 {/* State specific filter */}
@@ -1857,16 +1918,42 @@ export default function AdminPanel() {
                   </select>
                 </div>
 
-                {/* Author */}
+                {/* Author Desk / Manual Author Selection */}
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">संवाददाता / लेखक का नाम :</label>
-                  <input
-                    type="text"
-                    placeholder="उदा: विशेष संवाददाता, भोपाल"
-                    value={author}
-                    onChange={(e) => setAuthor(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
-                  />
+                  <label className="block text-[11px] font-bold text-neutral-600 mb-1">लेखक डेस्क (Desk / Author) * :</label>
+                  <select
+                    value={PRESET_DESKS.includes(selectedDesk) ? selectedDesk : "custom"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedDesk(val);
+                      if (val !== "custom") {
+                        setAuthor(val);
+                      } else {
+                        setAuthor(customAuthor);
+                      }
+                    }}
+                    className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-bold text-neutral-800"
+                  >
+                    {PRESET_DESKS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                    <option value="custom">✍️ अपना मैनुअल नाम लिखें (Custom Name)</option>
+                  </select>
+
+                  {(selectedDesk === "custom" || !PRESET_DESKS.includes(selectedDesk)) && (
+                    <div className="mt-1.5">
+                      <input
+                        type="text"
+                        placeholder="अपना नाम दर्ज करें (उदा: विशेष संवाददाता, भोपाल / राहुल शर्मा)..."
+                        value={customAuthor}
+                        onChange={(e) => {
+                          setCustomAuthor(e.target.value);
+                          setAuthor(e.target.value);
+                        }}
+                        className="w-full text-xs p-2 rounded-lg bg-white border border-amber-300 focus:border-[#ff6f00] outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* News cover Image Options */}

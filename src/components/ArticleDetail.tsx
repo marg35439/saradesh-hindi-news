@@ -452,11 +452,6 @@ export default function ArticleDetail({
           <Clock className="w-3.5 h-3.5 text-amber-600" />
           <span>{article.readTime} मिनट पठन समय</span>
         </span>
-        <span className="text-neutral-300 font-bold">•</span>
-        <span className="font-bold text-slate-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80 flex items-center gap-1">
-          <Eye className="w-3.5 h-3.5 text-blue-600" />
-          <span>{article.views || 0} बार देखा गया</span>
-        </span>
       </div>
 
       {/* Title */}

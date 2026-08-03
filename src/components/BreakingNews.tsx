@@ -8,8 +8,8 @@ interface BreakingNewsProps {
 }
 
 export default function BreakingNews({ articles, onArticleClick }: BreakingNewsProps) {
-  // Pass all articles so all news headings roll through the ticker!
-  const tickerList = articles.length > 0 ? articles : [];
+  // Take only the top 10 latest articles for the ticker
+  const tickerList = articles.length > 0 ? articles.slice(0, 10) : [];
 
   if (tickerList.length === 0) return null;
 

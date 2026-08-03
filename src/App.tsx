@@ -15,7 +15,7 @@ import { AuthorProfile } from "./components/AuthorProfile";
 import { PolicyPages } from "./components/PolicyPages";
 import { AdBanner } from "./components/AdBanner";
 import { initGA, logPageView } from "./lib/analytics";
-import { Article, CategoryKey, CATEGORIES, STATES } from "./types";
+import { Article, CategoryKey, CATEGORIES, STATES, SUBCATEGORIES } from "./types";
 import { fetchNewsList } from "./lib/newsClient";
 
 export default function App() {
@@ -71,6 +71,7 @@ export default function App() {
 
   // Filtering states
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<string>("सभी राज्य");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -196,7 +197,7 @@ export default function App() {
     initGA();
     logPageView(window.location.pathname + window.location.search);
 
-    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?state=..., ?author=..., ?page=...
+    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?subcategory=..., ?state=..., ?author=..., ?page=...
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") {
       setIsAdminMode(true);
@@ -208,6 +209,10 @@ export default function App() {
     const initialCat = params.get("category");
     if (initialCat) {
       setSelectedCategory(initialCat as CategoryKey);
+    }
+    const initialSubcat = params.get("subcategory");
+    if (initialSubcat) {
+      setSelectedSubcategory(initialSubcat);
     }
     const initialState = params.get("state");
     if (initialState) {
@@ -232,6 +237,8 @@ export default function App() {
       if (cat) {
         setSelectedCategory(cat as CategoryKey);
       }
+
+      setSelectedSubcategory(p.get("subcategory") || null);
 
       const st = p.get("state");
       if (st) {
@@ -265,11 +272,11 @@ export default function App() {
 
   useEffect(() => {
     loadNews();
-  }, [selectedCategory, selectedState, searchQuery, isAdminMode]);
+  }, [selectedCategory, selectedSubcategory, selectedState, searchQuery, isAdminMode]);
 
   const loadNews = () => {
     setLoading(true);
-    fetchNewsList(selectedCategory, selectedState, searchQuery)
+    fetchNewsList(selectedCategory, selectedState, searchQuery, selectedSubcategory || undefined)
       .then((data: Article[]) => {
         setArticles(data);
         setLoading(false);
@@ -386,9 +393,24 @@ export default function App() {
       {!isAdminMode && (
         <MainMenu
           selectedCategory={selectedCategory}
-          onSelectCategory={handleCategorySelect}
+          onSelectCategory={(cat) => {
+            setSelectedSubcategory(null);
+            handleCategorySelect(cat);
+          }}
           selectedState={selectedState}
           onSelectState={handleStateSelect}
+          selectedSubcategory={selectedSubcategory}
+          onSelectSubcategory={(subKey) => {
+            setSelectedSubcategory(subKey);
+            setSelectedArticleId(null);
+            try {
+              if (subKey) {
+                window.history.pushState({}, "", "?subcategory=" + encodeURIComponent(subKey));
+              } else {
+                window.history.pushState({}, "", selectedCategory === "all" ? "/" : "?category=" + encodeURIComponent(selectedCategory));
+              }
+            } catch {}
+          }}
           searchQuery={searchQuery}
           onSearchChange={(q) => {
             setSearchQuery(q);
@@ -672,13 +694,6 @@ export default function App() {
                                 <span>पूरी खबर पढ़ें</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </button>
-
-                              <div className="flex items-center gap-2 text-xs font-bold text-neutral-400 font-sans">
-                                <span className="flex items-center gap-1">
-                                  <Eye className="w-3.5 h-3.5 text-neutral-400" />
-                                  <span>{featuredArticle.views || 0}</span>
-                                </span>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -690,9 +705,11 @@ export default function App() {
                       <h3 className="text-base sm:text-xl font-black uppercase tracking-wide flex items-center gap-2 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white px-4 py-2 rounded-xl shadow-md border border-orange-400/40">
                         <Layers className="w-5 h-5 text-yellow-300 animate-pulse" />
                         <span>
-                          {selectedCategory === "all" 
-                            ? (searchQuery ? `खोज परिणाम: ${searchQuery}` : "🔥 ट्रेंडिंग और मुख्य समाचार (TOP 20 TRENDING NEWS)") 
-                            : `ताज़ा बुलेटिन : ${CATEGORIES.find(c => c.key === selectedCategory)?.hindiName || selectedCategory}`}
+                          {selectedSubcategory
+                            ? `विशेष कवरेज : ${SUBCATEGORIES.find(s => s.key === selectedSubcategory)?.hindiName || selectedSubcategory}`
+                            : selectedCategory === "all" 
+                              ? (searchQuery ? `खोज परिणाम: ${searchQuery}` : "🔥 ट्रेंडिंग और मुख्य समाचार (TOP 20 TRENDING NEWS)") 
+                              : `ताज़ा बुलेटिन : ${CATEGORIES.find(c => c.key === selectedCategory)?.hindiName || selectedCategory}`}
                         </span>
                       </h3>
                     </div>
@@ -1254,7 +1271,7 @@ export default function App() {
 
       {/* 5. Elegant footer layout */}
       <footer className="bg-neutral-900 text-neutral-400 border-t-4 border-neutral-950 py-10 mt-12 font-sans">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 text-xs">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-xs">
           <div>
             <div className="flex items-center gap-1.5 text-white font-extrabold text-sm mb-3">
               <span className="w-2.5 h-4.5 bg-[#ff6f00] rounded-xs inline-block"></span>
@@ -1284,18 +1301,67 @@ export default function App() {
                 <button
                   key={cat.id}
                   onClick={() => {
+                    setSelectedSubcategory(null);
                     setSelectedCategory(cat.id as CategoryKey);
                     setSelectedArticleId(null);
                     setSearchQuery("");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   className={`px-2 py-1 rounded transition-all cursor-pointer text-[10px] font-medium ${
-                    selectedCategory === cat.id
+                    selectedCategory === cat.id && !selectedSubcategory
                       ? "bg-[#ff6f00] text-white font-bold"
                       : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
                   }`}
                 >
                   {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-amber-400 font-bold text-xs mb-3 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>विशेष सब-कैटेगरी (Special Sub-Categories)</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[11px]">
+              <button
+                onClick={() => {
+                  setSelectedSubcategory(null);
+                  setSelectedArticleId(null);
+                  setSearchQuery("");
+                  try {
+                    window.history.pushState({}, "", selectedCategory === "all" ? "/" : "?category=" + encodeURIComponent(selectedCategory));
+                  } catch {}
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={`px-2 py-1 rounded transition-all cursor-pointer text-[10px] font-medium ${
+                  !selectedSubcategory
+                    ? "bg-[#ff6f00] text-white font-bold"
+                    : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                }`}
+              >
+                सभी सब-कैटेगरी
+              </button>
+              {SUBCATEGORIES.map((sub) => (
+                <button
+                  key={sub.key}
+                  onClick={() => {
+                    setSelectedSubcategory(sub.key);
+                    setSelectedArticleId(null);
+                    setSearchQuery("");
+                    try {
+                      window.history.pushState({}, "", "?subcategory=" + encodeURIComponent(sub.key));
+                    } catch {}
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={`px-2 py-1 rounded transition-all cursor-pointer text-[10px] font-medium ${
+                    selectedSubcategory === sub.key
+                      ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold shadow-xs"
+                      : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                  }`}
+                >
+                  {sub.hindiName}
                 </button>
               ))}
             </div>

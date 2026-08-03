@@ -233,11 +233,6 @@ export default function ArticleCard({
           </div>
 
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-1 bg-neutral-100 px-1.5 py-0.5 rounded-md text-neutral-700 font-bold" title="देखा गया">
-              <Eye className="w-3.5 h-3.5 text-blue-600" />
-              <span>{article.views || 0}</span>
-            </div>
-
             <div className="flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded-md text-rose-700 font-bold" title="पसंद">
               <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
               <span>{article.likes || 0}</span>

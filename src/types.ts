@@ -11,6 +11,7 @@ export interface Article {
   subtitle: string;
   content: string;
   category: string;
+  subcategory?: string;
   state?: string;
   image: string;
   author: string;
@@ -27,7 +28,7 @@ export interface Article {
   createdAt?: string;
 }
 
-export type CategoryKey = 'all' | 'national' | 'international' | 'state' | 'crime' | 'sports' | 'entertainment' | 'business' | 'tech' | 'lifestyle' | 'job' | 'education' | 'religion' | 'astrology' | 'schemes';
+export type CategoryKey = 'all' | 'national' | 'international' | 'state' | 'crime' | 'sports' | 'entertainment' | 'business' | 'tech' | 'lifestyle' | 'job' | 'education' | 'religion' | 'astrology' | 'schemes' | 'auto';
 
 export interface CategoryInfo {
   key: CategoryKey;
@@ -43,6 +44,7 @@ export const CATEGORIES: CategoryInfo[] = [
   { key: 'entertainment', hindiName: 'मनोरंजन' },
   { key: 'business', hindiName: 'बिजनेस' },
   { key: 'tech', hindiName: 'टेक' },
+  { key: 'auto', hindiName: 'ऑटो' },
   { key: 'lifestyle', hindiName: 'लाइफस्टाइल' },
   { key: 'international', hindiName: 'विदेश' },
   { key: 'job', hindiName: 'नौकरी / करियर' },
@@ -50,6 +52,42 @@ export const CATEGORIES: CategoryInfo[] = [
   { key: 'schemes', hindiName: 'सरकारी योजनाएं' },
   { key: 'education', hindiName: 'शिक्षा' },
   { key: 'religion', hindiName: 'धर्म' },
+];
+
+export interface SubCategoryInfo {
+  key: string;
+  hindiName: string;
+  categoryKey?: CategoryKey;
+  icon?: string;
+}
+
+export const SUBCATEGORIES: SubCategoryInfo[] = [
+  { key: 'cricket', hindiName: 'क्रिकेट', categoryKey: 'sports', icon: '🏏' },
+  { key: 'mobile', hindiName: 'मोबाइल', categoryKey: 'tech', icon: '📱' },
+  { key: 'ev', hindiName: 'ईवी (इलेक्ट्रिक वाहन)', categoryKey: 'auto', icon: '⚡' },
+  { key: 'rajneeti', hindiName: 'राजनीति', categoryKey: 'national', icon: '🏛️' },
+  { key: 'auto_news', hindiName: 'ऑटो न्यूज़', categoryKey: 'auto', icon: '🚗' },
+  { key: 'bollywood', hindiName: 'बॉलीवुड', categoryKey: 'entertainment', icon: '🎬' },
+  { key: 'stockmarket', hindiName: 'शेयर बाजार', categoryKey: 'business', icon: '📈' },
+  { key: 'jobalert', hindiName: 'जॉब अलर्ट', categoryKey: 'job', icon: '💼' },
+  { key: 'rashifal', hindiName: 'राशिफल', categoryKey: 'astrology', icon: '🔮' },
+];
+
+export const PRESET_DESKS = [
+  'नेशनल डेस्क',
+  'खेल डेस्क',
+  'मनोरंजन डेस्क',
+  'बिजनेस डेस्क',
+  'टेक डेस्क',
+  'ऑटो डेस्क',
+  'राजनीति डेस्क',
+  'राज्य डेस्क',
+  'क्राइम डेस्क',
+  'लाइफस्टाइल डेस्क',
+  'विदेश डेस्क',
+  'धर्म-आध्यात्म डेस्क',
+  'विशेष संवाददाता',
+  'सम्पादकीय टीम',
 ];
 
 export const STATES = [

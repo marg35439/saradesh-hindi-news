@@ -17,7 +17,8 @@ import {
 export async function fetchNewsList(
   category: CategoryKey = "all",
   state?: string,
-  searchQuery?: string
+  searchQuery?: string,
+  subcategory?: string
 ): Promise<Article[]> {
   let firestoreArticles: Article[] = [];
   let deletedIds: string[] = [];
@@ -68,6 +69,18 @@ export async function fetchNewsList(
     const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return timeB - timeA;
   });
+
+  // Subcategory filtering (if specified)
+  if (subcategory && subcategory.trim()) {
+    const subClean = subcategory.trim().toLowerCase();
+    items = items.filter(
+      (a) =>
+        (a.subcategory && a.subcategory.toLowerCase() === subClean) ||
+        a.title.toLowerCase().includes(subClean) ||
+        (a.tags && a.tags.some((t) => t.toLowerCase().includes(subClean))) ||
+        (a.subtitle && a.subtitle.toLowerCase().includes(subClean))
+    );
+  }
 
   // Category & State filtering
   if (category && category !== "all") {
@@ -232,6 +245,7 @@ export async function saveArticleClient(articleData: Partial<Article>): Promise<
     subtitle: articleData.subtitle || "",
     content: articleData.content || "",
     category: articleData.category || "national",
+    subcategory: articleData.subcategory || "",
     state: articleData.state || "",
     image: articleData.image || "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200",
     author: articleData.author || "दैनिक विशेष डेस्क",

@@ -1,12 +1,14 @@
 import React from "react";
-import { Search, MapPin, Grid, RefreshCw } from "lucide-react";
-import { CATEGORIES, STATES, CategoryKey } from "../types";
+import { Search, MapPin, Grid, RefreshCw, Sparkles } from "lucide-react";
+import { CATEGORIES, STATES, SUBCATEGORIES, CategoryKey } from "../types";
 
 interface MainMenuProps {
   selectedCategory: CategoryKey;
   onSelectCategory: (key: CategoryKey) => void;
   selectedState: string;
   onSelectState: (state: string) => void;
+  selectedSubcategory?: string | null;
+  onSelectSubcategory?: (subKey: string | null) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
 }
@@ -16,6 +18,8 @@ export default function MainMenu({
   onSelectCategory,
   selectedState,
   onSelectState,
+  selectedSubcategory,
+  onSelectSubcategory,
   searchQuery,
   onSearchChange,
 }: MainMenuProps) {
@@ -33,7 +37,7 @@ export default function MainMenu({
               <span className="text-xs font-semibold text-neutral-500">श्रेणियां:</span>
             </span>
             {CATEGORIES.map((cat) => {
-              const active = selectedCategory === cat.key;
+              const active = selectedCategory === cat.key && !selectedSubcategory;
               
               const getCategoryGradient = (key: string) => {
                 switch (key) {
@@ -45,6 +49,7 @@ export default function MainMenu({
                   case "entertainment": return "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20";
                   case "business": return "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20";
                   case "tech": return "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/20";
+                  case "auto": return "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md shadow-orange-500/20";
                   case "lifestyle": return "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/20";
                   case "international": return "bg-gradient-to-r from-violet-600 to-purple-800 text-white shadow-md shadow-violet-500/20";
                   case "job": return "bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-600 text-white shadow-md shadow-blue-500/20";
@@ -63,6 +68,7 @@ export default function MainMenu({
                   case "entertainment": return "border-l-4 border-l-purple-600 text-purple-950 hover:bg-purple-50";
                   case "business": return "border-l-4 border-l-blue-600 text-blue-950 hover:bg-blue-50";
                   case "tech": return "border-l-4 border-l-cyan-600 text-cyan-950 hover:bg-cyan-50";
+                  case "auto": return "border-l-4 border-l-orange-500 text-orange-950 hover:bg-orange-50";
                   case "lifestyle": return "border-l-4 border-l-pink-500 text-pink-950 hover:bg-pink-50";
                   case "international": return "border-l-4 border-l-violet-600 text-violet-950 hover:bg-violet-50";
                   case "job": return "border-l-4 border-l-blue-600 text-blue-950 hover:bg-blue-50";
@@ -75,7 +81,10 @@ export default function MainMenu({
               return (
                 <button
                   key={cat.key}
-                  onClick={() => onSelectCategory(cat.key)}
+                  onClick={() => {
+                    if (onSelectSubcategory) onSelectSubcategory(null);
+                    onSelectCategory(cat.key);
+                  }}
                   className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-extrabold tracking-wide transition-all duration-200 cursor-pointer ${
                     active
                       ? `${getCategoryGradient(cat.key)} scale-102 ring-2 ring-white/50`
@@ -109,7 +118,7 @@ export default function MainMenu({
           </div>
         </div>
 
-        {/* State-specific sub-news sub-ribbon (Toggles only when selectedCategory is "state" OR state news displays are active) */}
+        {/* State-specific sub-news sub-ribbon */}
         {selectedCategory === "state" && (
           <div className="border-t border-dashed border-neutral-200 py-2.5 animate-fadeIn">
             <div className="flex flex-wrap items-center gap-2">
