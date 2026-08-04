@@ -22,6 +22,8 @@ export interface Article {
   comments: Comment[];
   tags: string[];
   metaDescription?: string;
+  slug?: string;
+  mainCategory?: string;
   isBreaking: boolean;
   isFeatured: boolean;
   isTrending: boolean;

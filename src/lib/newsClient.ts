@@ -1,6 +1,7 @@
 import { Article, CategoryKey, Comment, SiteSettings, AuthorProfileData } from "../types";
 import { FALLBACK_NEWS } from "../data/fallbackNews";
 import { db, auth } from "./firebase";
+import { generateSeoSlug, getMainCategorySlug } from "./slug";
 import {
   collection,
   doc,
@@ -259,7 +260,9 @@ export async function saveArticleClient(articleData: Partial<Article>): Promise<
     isFeatured: !!articleData.isFeatured,
     isTrending: !!articleData.isTrending,
     createdAt: articleData.createdAt || nowStr,
-    metaDescription: articleData.metaDescription || ""
+    metaDescription: articleData.metaDescription || "",
+    slug: articleData.slug || generateSeoSlug(articleData.title || "बिना शीर्षक"),
+    mainCategory: articleData.mainCategory || getMainCategorySlug(articleData.category || "national")
   };
 
   try {

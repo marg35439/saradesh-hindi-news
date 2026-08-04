@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Article } from "../types";
+import { getArticleUrl } from "../lib/slug";
 
 interface SEOHeadProps {
   title?: string;
@@ -38,12 +39,12 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     let currentUrl = defaultDomain;
     let isArticle = false;
 
-    if (article) {
+    if (article && article.id) {
       isArticle = true;
-      metaTitle = `${article.title} - ${siteName}`;
-      metaDescription = article.subtitle || article.content.substring(0, 160).replace(/\n/g, " ") + "...";
+      metaTitle = `${article.title || "समाचार"} - ${siteName}`;
+      metaDescription = article.subtitle || (article.content ? article.content.substring(0, 160).replace(/\n/g, " ") + "..." : defaultDescription);
       metaImage = article.image || defaultImage;
-      currentUrl = `${defaultDomain}/?article=${encodeURIComponent(article.id)}`;
+      currentUrl = getArticleUrl(article, defaultDomain);
     } else if (categoryName) {
       metaTitle = `${categoryName} समाचार - ${siteName}`;
       metaDescription = `${categoryName} की सभी ताज़ा और प्रमुख खबरें पढ़ें केवल ${siteName} पर।`;

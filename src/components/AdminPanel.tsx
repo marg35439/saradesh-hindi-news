@@ -3,6 +3,7 @@ import { Sparkles, Send, Trash2, Edit2, Plus, BookOpen, AlertCircle, RefreshCw, 
 import { motion } from "motion/react";
 import { Article, CATEGORIES, STATES, SUBCATEGORIES, PRESET_DESKS, SiteSettings, AuthorProfileData } from "../types";
 import { fetchNewsList, saveArticleClient, deleteArticleClient, fetchSiteSettingsClient, saveSiteSettingsClient, fetchAuthorProfilesClient, saveAuthorProfileClient, deleteAuthorProfileClient } from "../lib/newsClient";
+import { generateSeoSlug, getMainCategorySlug } from "../lib/slug";
 
 import {
   auth,
@@ -524,6 +525,45 @@ export default function AdminPanel() {
   // Form States
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [manualEnglishTitle, setManualEnglishTitle] = useState("");
+  const [isSlugUserModified, setIsSlugUserModified] = useState(false);
+  const [generatingSlug, setGeneratingSlug] = useState(false);
+
+  const handleManualEnglishTitleChange = (rawInput: string) => {
+    setManualEnglishTitle(rawInput);
+    // Convert spaces and special characters into lowercase hyphenated slug
+    const formattedSlug = rawInput
+      .toLowerCase()
+      .replace(/[^a-z0-9\s\-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/\-+/g, "-");
+    setSlug(formattedSlug);
+    setIsSlugUserModified(true);
+  };
+
+  const handleGenerateAiSlug = async () => {
+    if (!title.trim()) return;
+    setGeneratingSlug(true);
+    try {
+      const res = await fetch("/api/gemini/generate-slug", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content })
+      });
+      const data = await res.json();
+      if (data.slug) {
+        setSlug(data.slug);
+        setManualEnglishTitle(data.slug.replace(/-/g, " "));
+        setIsSlugUserModified(false);
+      }
+    } catch (err) {
+      console.error("Slug generation error:", err);
+    } finally {
+      setGeneratingSlug(false);
+    }
+  };
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("national");
   const [subcategory, setSubcategory] = useState("");
@@ -1086,6 +1126,11 @@ export default function AdminPanel() {
       setTitle(data.title || "");
       setSubtitle(data.subtitle || "");
       setContent(data.content || "");
+      if (data.slug) {
+        setSlug(data.slug);
+        setManualEnglishTitle(data.slug.replace(/-/g, " "));
+        setIsSlugUserModified(false);
+      }
       setCategory(data.category || category);
       setStateName(stateName || "");
       setAuthor(data.author || "सारादेश.in एआई रिपोर्टर");
@@ -1124,6 +1169,8 @@ export default function AdminPanel() {
       author: effectiveAuthor,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
       metaDescription: metaDescription.trim() || undefined,
+      slug: slug.trim() || generateSeoSlug(title),
+      mainCategory: getMainCategorySlug(category),
       isBreaking,
       isFeatured,
       isTrending
@@ -1142,6 +1189,9 @@ export default function AdminPanel() {
     setEditingId(art.id);
     setTitle(art.title);
     setSubtitle(art.subtitle);
+    setSlug(art.slug || generateSeoSlug(art.title));
+    setManualEnglishTitle(art.slug ? art.slug.replace(/-/g, " ") : "");
+    setIsSlugUserModified(false);
     setContent(art.content);
     setCategory(art.category);
     setStateName(art.state || "");
@@ -1208,6 +1258,9 @@ export default function AdminPanel() {
     setEditingId(null);
     setTitle("");
     setSubtitle("");
+    setSlug("");
+    setManualEnglishTitle("");
+    setIsSlugUserModified(false);
     setContent("");
     setCategory("national");
     setSubcategory("");
@@ -1847,9 +1900,94 @@ export default function AdminPanel() {
                     required
                     placeholder="उदा: चंद्रयान-4 की सटीक लॉन्च डेट का एलान..."
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      const newTitle = e.target.value;
+                      setTitle(newTitle);
+                      if (!editingId && !isSlugUserModified) {
+                        setSlug(generateSeoSlug(newTitle));
+                      }
+                    }}
                     className="w-full text-xs p-2.5 rounded-lg bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
                   />
+                </div>
+
+                {/* SEO URL Slug Field */}
+                <div className="md:col-span-2 bg-amber-50/60 border border-amber-200/80 rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-[11px] font-bold text-neutral-700 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                      <span>एसईओ यूआरएल स्लग (SEO Permanent URL Slug) :</span>
+                      <span className="text-[10px] text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded ml-1">
+                        {isSlugUserModified ? "मैनुअल स्लग (Edited)" : "ऑटो जनरेटेड (Auto)"}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAiSlug}
+                      disabled={generatingSlug || !title.trim()}
+                      className="text-[11px] font-medium bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-2.5 py-1 rounded-md transition-all flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {generatingSlug ? (
+                        <>
+                          <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
+                          <span>AI स्लग बन रहा है...</span>
+                        </>
+                      ) : (
+                        <span>✨ AI से इंग्लिश SEO स्लग बनाएं</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Manual English Title Box for Auto-Hyphenated Slug */}
+                  <div className="bg-white border border-amber-200 rounded-lg p-2.5 shadow-xs">
+                    <label className="block text-[11px] font-bold text-amber-950 mb-1 flex items-center justify-between flex-wrap gap-1">
+                      <span className="flex items-center gap-1">
+                        <span>✍️</span>
+                        <span>मैनुअल इंग्लिश टाइटल / वाक्यांश (Type English Title for Slug) :</span>
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        स्पेस खुद-ब-खुद हाइफन (-) में बदल जाएगा
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={manualEnglishTitle}
+                      onChange={(e) => handleManualEnglishTitleChange(e.target.value)}
+                      placeholder="उदा: Delhi expands electric bus fleet to promote green transport"
+                      className="w-full text-xs font-semibold p-2 rounded-md bg-neutral-50 border border-neutral-300 focus:bg-white focus:border-amber-500 text-neutral-900 outline-none"
+                    />
+                  </div>
+
+                  {/* Final Generated Slug Preview & Direct Edit */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-neutral-600 mb-1">
+                      अंतिम जनरेटेड यूआरएल स्लग (Final URL Slug) :
+                    </label>
+                    <div className="flex items-center bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-neutral-600 shadow-xs">
+                      <span className="text-neutral-400 font-semibold select-none shrink-0">
+                        saradesh.in/{getMainCategorySlug(category)}/
+                      </span>
+                      <input
+                        type="text"
+                        value={slug}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, "-");
+                          setSlug(val);
+                          setManualEnglishTitle(val.replace(/-/g, " "));
+                          setIsSlugUserModified(true);
+                        }}
+                        placeholder="delhi-expands-electric-bus-fleet-to-promote-green-transport"
+                        className="w-full bg-transparent border-none outline-none font-mono text-neutral-900 font-bold px-1"
+                      />
+                      <span className="text-neutral-400 font-semibold select-none shrink-0">
+                        -{editingId || "art-id"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-neutral-500 font-sans">
+                    यह स्थायी इंग्लिश एसईओ यूआरएल (Permanent URL) गूगल सर्च व डिस्कवर के लिए बेहद महत्वपूर्ण है।
+                  </p>
                 </div>
 
                 {/* News Subtitle */}

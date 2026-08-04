@@ -17,6 +17,7 @@ import { AdBanner } from "./components/AdBanner";
 import { initGA, logPageView } from "./lib/analytics";
 import { Article, CategoryKey, CATEGORIES, STATES, SUBCATEGORIES } from "./types";
 import { fetchNewsList } from "./lib/newsClient";
+import { getArticleUrl, parseArticleUrlPath } from "./lib/slug";
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -197,16 +198,19 @@ export default function App() {
     initGA();
     logPageView(window.location.pathname + window.location.search);
 
-    // 1. Check URL parameters for ?admin=true, ?article=..., ?category=..., ?subcategory=..., ?state=..., ?author=..., ?page=...
+    // 1. Check URL parameters and path for routing
     const params = new URLSearchParams(window.location.search);
     if (params.get("admin") === "true") {
       setIsAdminMode(true);
     }
-    const initialArticleId = params.get("article") || params.get("id");
+
+    // Check path-based article URL first
+    const pathParsed = parseArticleUrlPath(window.location.pathname);
+    const initialArticleId = pathParsed?.articleId || params.get("article") || params.get("id");
     if (initialArticleId) {
       setSelectedArticleId(initialArticleId);
     }
-    const initialCat = params.get("category");
+    const initialCat = pathParsed?.category || params.get("category");
     if (initialCat) {
       setSelectedCategory(initialCat as CategoryKey);
     }
@@ -230,10 +234,11 @@ export default function App() {
     // 2. Popstate listener for browser back/forward buttons
     const handlePopState = () => {
       const p = new URLSearchParams(window.location.search);
-      const articleId = p.get("article") || p.get("id");
+      const pp = parseArticleUrlPath(window.location.pathname);
+      const articleId = pp?.articleId || p.get("article") || p.get("id");
       setSelectedArticleId(articleId || null);
 
-      const cat = p.get("category");
+      const cat = pp?.category || p.get("category");
       if (cat) {
         setSelectedCategory(cat as CategoryKey);
       }
@@ -291,7 +296,7 @@ export default function App() {
     setIsAdminMode(false); // return to normal reading
     setSelectedArticleId(art.id);
     try {
-      window.history.pushState({}, "", "?article=" + encodeURIComponent(art.id));
+      window.history.pushState({}, "", getArticleUrl(art));
     } catch {}
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

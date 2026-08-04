@@ -8,6 +8,7 @@ import cors from "cors";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Article } from "./src/types";
 import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
+import { generateSeoSlug, getMainCategorySlug, getArticleUrl, parseArticleUrlPath } from "./src/lib/slug.js";
 
 // Firebase Imports
 import { initializeApp } from "firebase/app";
@@ -167,6 +168,74 @@ function getGeminiClient(): GoogleGenAI {
     });
   }
   return aiClient;
+}
+
+/**
+ * Generates a natural, human-quality English SEO URL slug by understanding 
+ * both the article title and complete article content using Gemini AI.
+ * (e.g. Aaj Tak, India Today, BBC, Reuters style slugs).
+ */
+export async function generateEnglishSeoSlugWithGemini(title: string, content?: string): Promise<string> {
+  if (!title || typeof title !== "string" || !title.trim()) {
+    return "news";
+  }
+
+  const cleanTitle = title.trim();
+  const cleanContent = (content || "").trim();
+
+  try {
+    const ai = getGeminiClient();
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: `You are a chief SEO editor at Reuters and BBC News. Analyze the Hindi news title and body content, and translate its core MEANING into a concise, natural 5 to 8 word English URL slug.
+
+HINDI NEWS TITLE:
+${cleanTitle}
+
+${cleanContent ? `HINDI ARTICLE CONTENT:\n${cleanContent.substring(0, 1000)}` : ""}
+
+CRITICAL RULES:
+1. Translate the Hindi headline and context into natural English vocabulary (e.g. "interstate-cyber-fraud-gang-busted-in-digital-arrest-scam").
+2. DO NOT output Hindi phonetic transliterations (NEVER use words like "antrrajyeey", "saibr", "thgee", "prdafash").
+3. Use ONLY lowercase English letters (a-z) and hyphens (-).`,
+      config: {
+        systemInstruction: "You are an English SEO news editor. Translate Hindi news articles into natural English URL slugs. Do NOT transliterate Hindi phonetics. Output valid JSON with 'slug' property.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            slug: {
+              type: "STRING",
+              description: "Publication-grade English SEO URL slug using lowercase letters and hyphens only"
+            }
+          },
+          required: ["slug"]
+        },
+        temperature: 0.1,
+      }
+    });
+
+    const jsonText = response.text ? response.text.trim() : "";
+    if (jsonText) {
+      const parsed = JSON.parse(jsonText);
+      if (parsed.slug && typeof parsed.slug === "string") {
+        let cleaned = parsed.slug
+          .toLowerCase()
+          .replace(/[^a-z0-9\s\-]/g, "")
+          .replace(/\s+/g, "-")
+          .replace(/\-+/g, "-")
+          .replace(/^\-+|\-+$/g, "");
+        if (cleaned && cleaned.length >= 3 && !/^[0-9\-]+$/.test(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error("Gemini AI slug generation error:", err?.message || err);
+  }
+
+  // Fallback to client-side heuristic generator if Gemini fails or rate limits
+  return generateSeoSlug(title);
 }
 
 // Initial robust Dainik Bhaskar style Hindi articles with complete rich content
@@ -1386,6 +1455,22 @@ app.get("/api/news/:id", async (req, res) => {
   }
 });
 
+// POST /api/gemini/generate-slug - Generate natural English SEO slug using AI analyzing title & content
+app.post("/api/gemini/generate-slug", async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ error: "शीर्षक भरना अनिवार्य है।" });
+    }
+
+    const slug = await generateEnglishSeoSlugWithGemini(title, content);
+    res.json({ success: true, slug });
+  } catch (err: any) {
+    console.error("Error generating SEO slug:", err);
+    res.status(500).json({ error: "एसईओ स्लग उत्पादन में त्रुटि: " + err.message });
+  }
+});
+
 // POST Gemini generate news endpoint
 app.post("/api/gemini/generate", async (req, res) => {
   const { prompt, category, state } = req.body;
@@ -1476,6 +1561,9 @@ app.post("/api/gemini/generate", async (req, res) => {
         parsedData.image = "https://images.unsplash.com/photo-1495020689067-958852a6565d?q=80&w=800&auto=format&fit=crop";
       }
     }
+
+    // Generate English SEO slug using AI analyzing title and content
+    parsedData.slug = await generateEnglishSeoSlugWithGemini(parsedData.title, parsedData.content);
 
     res.json(parsedData);
   } catch (err: any) {
@@ -1604,7 +1692,7 @@ For each real story, compile:
 - A short English search term representing the occurrence.`;
 
     const searchResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: searchPrompt,
       config: {
         tools: [{ googleSearch: {} }] // Simpler call with search grounding
@@ -1630,7 +1718,7 @@ interface ScrapedNewsItem {
 }`;
 
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `Parse these real-time news articles text and output them as a JSON array according to the schema:
       
       ${searchOutputText}`,
@@ -1727,7 +1815,7 @@ app.post("/api/gemini/publish-top10-day", async (req, res) => {
 
       // Step 1: Grounded Search for live today news
       const searchRes = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: `Search Google and gather today's top 10 breaking news headlines across India in Hindi (national, sports, business, tech, entertainment, international). Collect facts, summaries, and core story details for each of the 10 news stories.`,
         config: {
           tools: [{ googleSearch: {} }]
@@ -1754,7 +1842,7 @@ interface GeneratedArticle {
 Do not include extra text. Output raw JSON array only.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: `Format these news items into a JSON array of 10 complete news articles according to schema:\n\n${searchResultText}`,
         config: {
           systemInstruction: systemPrompt,
@@ -1901,7 +1989,7 @@ You MUST return a JSON array conforming to this schema:
 Return a valid JSON array only. Set responseMimeType to application/json.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `Look over this raw material and compile it into multiple completed news items systematically:\n\n${rawMaterial}`,
       config: {
         systemInstruction: systemPrompt,
@@ -2030,7 +2118,7 @@ Return a clean JSON array only.`
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: { parts: [imagePart, textPart] },
       config: {
         responseMimeType: "application/json",
@@ -2200,7 +2288,7 @@ For each story:
 7. Set a professional Hindi author name.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: searchPrompt,
       config: {
         tools: [{ googleSearch: {} }] // Simpler text generation with search grounding fallback
@@ -2230,7 +2318,7 @@ Schema:
 ]`;
 
     const formatResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `Parse these scraped news articles text and output them as a JSON array according to the schema:
       
       ${outputText}`,
@@ -2577,7 +2665,7 @@ app.post("/api/news/:id/comment", async (req, res) => {
 // POST create manual news
 app.post("/api/news", async (req, res) => {
   try {
-    const { title, subtitle, content, category, state, image, author, tags, metaDescription, isBreaking, isFeatured, isTrending } = req.body;
+    const { title, subtitle, content, category, state, image, author, tags, metaDescription, slug, isBreaking, isFeatured, isTrending } = req.body;
     
     if (!title || !content || !category) {
       return res.status(400).json({ error: "शीर्षक, सामग्री और श्रेणी भरना अनिवार्य है।" });
@@ -2586,6 +2674,13 @@ app.post("/api/news", async (req, res) => {
     const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
     const dateStr = new Date().toLocaleDateString('hi-IN', options);
     const articleId = "news-" + Date.now();
+
+    let finalSlug = slug && typeof slug === "string" && slug.trim() 
+      ? slug.trim().toLowerCase().replace(/[^a-z0-9\-]/g, "-").replace(/\-+/g, "-") 
+      : "";
+    if (!finalSlug) {
+      finalSlug = await generateEnglishSeoSlugWithGemini(title, content);
+    }
 
     const newArticle = {
       id: articleId,
@@ -2603,6 +2698,7 @@ app.post("/api/news", async (req, res) => {
       comments: [],
       tags: typeof tags === "string" ? (tags as string).split(",").map(t => t.trim()).filter(Boolean) : (tags || []),
       metaDescription: metaDescription || null,
+      slug: finalSlug,
       isBreaking: !!isBreaking,
       isFeatured: !!isFeatured,
       isTrending: !!isTrending,
@@ -2648,9 +2744,24 @@ app.put("/api/news/:id", async (req, res) => {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const existingData = docSnap.data();
-        mergedArticle = { ...existingData, ...updatedData, id: articleId };
+        // Preserve existing slug permanently after publication unless explicitly updated in payload
+        let finalSlug = existingData.slug;
+        if (updatedData.slug && typeof updatedData.slug === "string" && updatedData.slug.trim()) {
+          finalSlug = updatedData.slug.trim().toLowerCase().replace(/[^a-z0-9\-]/g, "-").replace(/\-+/g, "-");
+        } else if (!finalSlug) {
+          finalSlug = await generateEnglishSeoSlugWithGemini(updatedData.title || existingData.title, updatedData.content || existingData.content);
+        }
+
+        mergedArticle = { ...existingData, ...updatedData, slug: finalSlug, id: articleId };
         await setDoc(docRef, mergedArticle, { merge: true });
       } else {
+        let finalSlug = updatedData.slug && typeof updatedData.slug === "string" && updatedData.slug.trim()
+          ? updatedData.slug.trim().toLowerCase().replace(/[^a-z0-9\-]/g, "-").replace(/\-+/g, "-")
+          : "";
+        if (!finalSlug) {
+          finalSlug = await generateEnglishSeoSlugWithGemini(updatedData.title || "news", updatedData.content || "");
+        }
+        mergedArticle = { ...updatedData, slug: finalSlug, id: articleId };
         await setDoc(docRef, mergedArticle, { merge: true });
       }
     } catch (fsErr) {
@@ -2707,7 +2818,7 @@ app.post("/api/gemini/generate", async (req, res) => {
     - Keep everything in proper Hindi language (Devanagari script), using technical and common terms naturally.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `कृप्या इस विषय पर सारादेश.in की गंभीर एवं विश्वसनीय हिंदी पत्रकारिता शैली में एक बेहतरीन हिंदी खबर का प्रारूप तैयार करें: "${prompt}". श्रेणी: "${category || 'सामान्य'}". राज्य: "${state || 'सामान्य'}".`,
       config: {
         systemInstruction: systemPrompt,
@@ -2791,7 +2902,7 @@ app.post("/api/gemini/autopilot", async (req, res) => {
 
     // Step 1: Perform real-time search grounding for the chosen topic
     const searchRes = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `Search Google for the latest breaking news today in India/Globe about: "${chosenTopic.prompt}". Get facts, quotes, dates, and full story details.`,
       config: {
         tools: [{ googleSearch: {} }]
@@ -2815,7 +2926,7 @@ app.post("/api/gemini/autopilot", async (req, res) => {
     - Author: A highly realistic journalist name (e.g. "रोहित शर्मा", "प्रिया सिन्हा", "अजय बाजपेयी").`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: `Draft a full news article in JSON format based on these real news search results for category "${chosenTopic.category}":\n\n${searchOutput}`,
       config: {
         systemInstruction: systemPrompt,
@@ -2948,7 +3059,13 @@ async function ensureRequestedArticlesExist() {
 
   try {
     for (const art of articlesToSave) {
-      await setDoc(doc(db, "articles", art.id), art);
+      const slug = generateSeoSlug(art.title);
+      const mainCat = getMainCategorySlug(art.category);
+      await setDoc(doc(db, "articles", art.id), {
+        ...art,
+        slug,
+        mainCategory: mainCat
+      });
     }
     console.log("Successfully seeded/updated the two user requested articles in Firestore!");
   } catch (err: any) {
@@ -3058,8 +3175,9 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
     if (!art || !art.id) continue;
     if (art.author && typeof art.author === "string") authorsSet.add(art.author);
     const artDate = art.createdAt ? new Date(art.createdAt).toISOString().split("T")[0] : currentDate;
+    const artUrl = getArticleUrl(art, baseUrl);
     xml += `  <url>\n`;
-    xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
+    xml += `    <loc>${artUrl}</loc>\n`;
     xml += `    <lastmod>${artDate}</lastmod>\n`;
     xml += `    <changefreq>daily</changefreq>\n`;
     xml += `    <priority>0.9</priority>\n`;
@@ -3117,8 +3235,9 @@ async function generateNewsSitemapXml(): Promise<string> {
   for (const art of recentArticles) {
     if (!art || !art.id) continue;
     const artIsoDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
+    const artUrl = getArticleUrl(art, baseUrl);
     xml += `  <url>\n`;
-    xml += `    <loc>${baseUrl}/?article=${encodeURIComponent(art.id)}</loc>\n`;
+    xml += `    <loc>${artUrl}</loc>\n`;
     xml += `    <news:news>\n`;
     xml += `      <news:publication>\n`;
     xml += `        <news:name>सारादेश</news:name>\n`;
@@ -3160,7 +3279,7 @@ async function generateRssFeedXml(): Promise<string> {
   for (const art of articlesList.slice(0, 50)) {
     if (!art || !art.id) continue;
     const pubDate = art.createdAt ? new Date(art.createdAt).toUTCString() : new Date().toUTCString();
-    const artUrl = `${baseUrl}/?article=${encodeURIComponent(art.id)}`;
+    const artUrl = getArticleUrl(art, baseUrl);
     const descriptionText = art.subtitle || (typeof art.content === "string" ? art.content.substring(0, 200) : "");
     xml += `    <item>\n`;
     xml += `      <title>${escapeXml(art.title)}</title>\n`;
@@ -3231,8 +3350,146 @@ app.get("/sitemap-index.xml", (req, res) => {
   res.status(200).send(xml);
 });
 
+// 301 Permanent Redirect Middleware for Legacy Article Query URLs (e.g. ?article=art-123)
+app.use(async (req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.includes(".")) {
+    const legacyArticleId = (req.query.article || req.query.id) as string | undefined;
+    if (legacyArticleId && typeof legacyArticleId === "string" && legacyArticleId.trim().length > 0) {
+      try {
+        const cleanId = legacyArticleId.trim();
+        let art: Article | null = FALLBACK_NEWS.find((a) => a.id === cleanId) || null;
+        if (!art) {
+          const docRef = doc(db, "articles", cleanId);
+          const docSnap = await Promise.race([
+            getDoc(docRef),
+            new Promise<null>((r) => setTimeout(() => r(null), 400))
+          ]);
+          if (docSnap && (docSnap as any).exists && (docSnap as any).exists()) {
+            art = (docSnap as any).data() as Article;
+          }
+        }
+        if (art) {
+          const canonicalUrl = getArticleUrl(art);
+          return res.redirect(301, canonicalUrl);
+        }
+      } catch (err) {
+        console.error("301 legacy URL redirect error:", err);
+      }
+    }
+  }
+  next();
+});
+
+// SSR Route handler for enterprise SEO Article URLs e.g. /:category/:slugAndId
+app.get("/:category/:slugAndId", async (req, res, next) => {
+  if (req.params.category === "api" || req.params.slugAndId.includes(".")) {
+    return next();
+  }
+
+  const parsed = parseArticleUrlPath(req.path);
+  if (!parsed || !parsed.articleId) {
+    return next();
+  }
+
+  try {
+    const cleanId = parsed.articleId;
+    let art: Article | null = FALLBACK_NEWS.find((a) => a && a.id === cleanId) || null;
+    if (!art) {
+      try {
+        const docRef = doc(db, "articles", cleanId);
+        const docSnap = await Promise.race([
+          getDoc(docRef),
+          new Promise<null>((r) => setTimeout(() => r(null), 400))
+        ]);
+        if (docSnap && (docSnap as any).exists && (docSnap as any).exists()) {
+          art = (docSnap as any).data() as Article;
+        }
+      } catch (e) {
+        // Ignore timeout
+      }
+    }
+
+    if (!art || !art.id) {
+      return next();
+    }
+
+    const canonicalPath = getArticleUrl(art);
+    const domain = "saradesh.in";
+    const fullCanonicalUrl = `https://${domain}${canonicalPath}`;
+
+    // 301 Redirect if requested URL path differs from stored canonical URL path
+    if (req.path !== canonicalPath) {
+      return res.redirect(301, canonicalPath);
+    }
+
+    const title = `${art.title} - सारादेश`;
+    const description = art.subtitle || (art.content ? art.content.substring(0, 160).replace(/\n/g, " ") : "ताज़ा हिंदी समाचार");
+    const image = art.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200";
+    const pubDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
+
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": fullCanonicalUrl
+      },
+      "headline": art.title,
+      "image": [image],
+      "datePublished": pubDate,
+      "dateModified": pubDate,
+      "author": {
+        "@type": "Person",
+        "name": art.author || "सम्पादकीय टीम",
+        "url": `https://${domain}/?author=${encodeURIComponent(art.author || "सम्पादकीय टीम")}`
+      },
+      "publisher": {
+        "@type": "NewsMediaOrganization",
+        "name": "सारादेश",
+        "url": `https://${domain}`,
+        "logo": {
+          "@type": "ImageObject",
+          "url": image
+        }
+      },
+      "description": description,
+      "articleBody": art.content,
+      "inLanguage": "hi"
+    };
+
+    let indexPath = path.join(process.cwd(), "index.html");
+    if (process.env.NODE_ENV === "production" && fsDirect.existsSync(path.join(process.cwd(), "dist", "index.html"))) {
+      indexPath = path.join(process.cwd(), "dist", "index.html");
+    }
+
+    let htmlTemplate = await fs.readFile(indexPath, "utf8");
+
+    let injectedHtml = htmlTemplate
+      .replace(/<title>.*?<\/title>/gi, `<title>${escapeXml(title)}</title>`)
+      .replace(/<meta name="description" content=".*?"\s*\/?>/gi, `<meta name="description" content="${escapeXml(description)}" />`)
+      .replace(/<meta property="og:title" content=".*?"\s*\/?>/gi, `<meta property="og:title" content="${escapeXml(title)}" />`)
+      .replace(/<meta property="og:description" content=".*?"\s*\/?>/gi, `<meta property="og:description" content="${escapeXml(description)}" />`)
+      .replace(/<meta property="og:image" content=".*?"\s*\/?>/gi, `<meta property="og:image" content="${escapeXml(image)}" />`)
+      .replace(/<meta property="og:url" content=".*?"\s*\/?>/gi, `<meta property="og:url" content="${fullCanonicalUrl}" />`);
+
+    const headInjection = `
+      <link rel="canonical" href="${fullCanonicalUrl}" />
+      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+      <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+      <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+    `;
+
+    injectedHtml = injectedHtml.replace("</head>", `${headInjection}</head>`);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(injectedHtml);
+  } catch (err) {
+    console.error("Error generating article SSR HTML:", err);
+    return next();
+  }
+});
+
 async function startServer() {
-  // Serve static Vite site in prod when running as standalone Node process (not Vercel serverless)
+  // Serve static Vite site in dev or prod when running as standalone Node process
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -3240,25 +3497,40 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+
+    // SPA fallback in development mode using Vite's index.html transformation
+    app.get("*", async (req, res, next) => {
+      try {
+        const url = req.originalUrl;
+        const indexPath = path.join(process.cwd(), "index.html");
+        let template = await fs.readFile(indexPath, "utf-8");
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    // Express v4 handles SPA fallback
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const distIndex = path.join(distPath, "index.html");
+      if (fsDirect.existsSync(distIndex)) {
+        res.sendFile(distIndex);
+      } else {
+        res.sendFile(path.join(process.cwd(), "index.html"));
+      }
     });
   }
 
   if (!process.env.VERCEL) {
-    // Ensure these requested articles exist in the database
-    try {
-      await ensureRequestedArticlesExist();
-    } catch (e) {
-      console.warn("Non-blocking error checking startup articles:", e);
-    }
-
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Dainik Bhaskar custom server listening on port ${PORT}`);
+      // Ensure requested articles exist in the background (non-blocking)
+      ensureRequestedArticlesExist().catch((e) => {
+        console.warn("Non-blocking error checking startup articles:", e);
+      });
     });
   }
 }
