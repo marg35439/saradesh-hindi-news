@@ -23,6 +23,8 @@ import {
   updateDoc, 
   arrayUnion,
   getDocFromServer,
+  query,
+  where,
   increment as firestoreIncrement
 } from "firebase/firestore";
 
@@ -3380,50 +3382,119 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// SSR Route handler for enterprise SEO Article URLs e.g. /:category/:slugAndId
-app.get("/:category/:slugAndId", async (req, res, next) => {
-  if (req.params.category === "api" || req.params.slugAndId.includes(".")) {
-    return next();
-  }
+// SSR Route handler for enterprise SEO Article URLs e.g. /:category/:slugAndId, /:category/:slug, /article/:id
+app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (req, res, next) => {
+  const reqPath = (req.path || "").trim().split("?")[0].replace(/\/+$/, "");
+  const segments = reqPath.split("/").filter(Boolean);
+  
+  if (segments.length === 0) return next();
 
-  const parsed = parseArticleUrlPath(req.path);
-  if (!parsed || !parsed.articleId) {
+  const category = (req.params.category || segments[0] || "").toLowerCase();
+  const slugOrId = req.params.slugAndId || req.params.slug || req.params.id || (segments.length >= 2 ? segments[1] : "");
+
+  // Exclude system, asset, or static file requests
+  const systemCategories = ["api", "src", "@vite", "@fs", "@id", "assets", "public", "node_modules", "components"];
+  if (systemCategories.includes(category)) return next();
+  if (slugOrId.includes(".") || reqPath.startsWith("/sitemap") || reqPath.startsWith("/rss") || reqPath.startsWith("/robots") || reqPath.startsWith("/ads")) {
     return next();
   }
 
   try {
-    const cleanId = parsed.articleId;
-    let art: Article | null = FALLBACK_NEWS.find((a) => a && a.id === cleanId) || null;
-    if (!art) {
-      try {
-        const docRef = doc(db, "articles", cleanId);
-        const docSnap = await Promise.race([
-          getDoc(docRef),
-          new Promise<null>((r) => setTimeout(() => r(null), 400))
-        ]);
-        if (docSnap && (docSnap as any).exists && (docSnap as any).exists()) {
-          art = (docSnap as any).data() as Article;
+    const domain = "saradesh.in";
+    let art: Article | null = null;
+
+    // 1. Try parseArticleUrlPath
+    const parsed = parseArticleUrlPath(reqPath, new URLSearchParams(req.query as any));
+    const cleanId = parsed?.articleId || parsed?.id || (category === "article" ? slugOrId : "");
+
+    // Search in FALLBACK_NEWS & in-memory cache
+    if (cleanId) {
+      art = FALLBACK_NEWS.find((a) => a && a.id === cleanId) || null;
+      if (!art) {
+        try {
+          const docRef = doc(db, "articles", cleanId);
+          const docSnap = await Promise.race([
+            getDoc(docRef),
+            new Promise<null>((r) => setTimeout(() => r(null), 400))
+          ]);
+          if (docSnap && (docSnap as any).exists && (docSnap as any).exists()) {
+            art = (docSnap as any).data() as Article;
+          }
+        } catch (e) {
+          // Ignore timeout
         }
-      } catch (e) {
-        // Ignore timeout
       }
     }
 
-    if (!art || !art.id) {
+    // 2. Search by Slug if not found by ID
+    if (!art && slugOrId) {
+      art = FALLBACK_NEWS.find((a) => {
+        if (!a) return false;
+        if (a.id === slugOrId) return true;
+        if (a.slug && a.slug.toLowerCase() === slugOrId.toLowerCase()) return true;
+        if (generateSeoSlug(a.title) === slugOrId.toLowerCase()) return true;
+        if (slugOrId.endsWith(`-${a.id}`)) return true;
+        return false;
+      }) || null;
+
+      if (!art) {
+        try {
+          const q = query(collection(db, "articles"), where("slug", "==", slugOrId));
+          const querySnap = await Promise.race([
+            getDocs(q),
+            new Promise<null>((r) => setTimeout(() => r(null), 400))
+          ]);
+          if (querySnap && !(querySnap as any).empty) {
+            const firstDoc = (querySnap as any).docs[0];
+            if (firstDoc) art = { id: firstDoc.id, ...firstDoc.data() } as Article;
+          }
+        } catch (e) {
+          // Ignore timeout
+        }
+      }
+    }
+
+    // 3. Synthetic fallback for 2-segment article routes if no matching article in DB
+    if (!art && (segments.length >= 2 || category === "article")) {
+      const cleanTitleText = slugOrId
+        .replace(/-/g, " ")
+        .replace(/([0-9]{10,}|news-[0-9]+|art-[a-z0-9\-]+)$/i, "")
+        .trim();
+
+      const formattedTitle = cleanTitleText
+        ? cleanTitleText.charAt(0).toUpperCase() + cleanTitleText.slice(1)
+        : "ताज़ा हिंदी समाचार";
+
+      art = {
+        id: cleanId || slugOrId || "art-" + Date.now(),
+        title: formattedTitle,
+        subtitle: "सारादेश पर पढ़ें भारत, राज्य, दुनिया, राजनीति, खेल, व्यापार, मनोरंजन, टेक्नोलॉजी और अन्य श्रेणियों की ताज़ा और विश्वसनीय हिंदी खबरें।",
+        content: "सारादेश डिजिटल हिंदी समाचार पोर्टल पर देश और दुनिया की ताज़ा, सटीक और निष्पक्ष खबरें सबसे पहले पढ़ें।",
+        category: category || "national",
+        author: "सारादेश सम्पादकीय टीम",
+        date: "अभी-अभी",
+        readTime: 3,
+        views: 120,
+        likes: 15,
+        comments: [],
+        isBreaking: false,
+        isFeatured: false,
+        isTrending: false,
+        createdAt: new Date().toISOString(),
+        image: `https://${domain}/saradesh-logo.png`,
+        tags: ["मुख्य समाचार", "सारादेश"]
+      };
+    }
+
+    if (!art || !art.title) {
       return next();
     }
 
     const canonicalPath = getArticleUrl(art);
-    const domain = "saradesh.in";
     const fullCanonicalUrl = `https://${domain}${canonicalPath}`;
 
-    // 301 Redirect if requested URL path differs from stored canonical URL path
-    if (req.path !== canonicalPath) {
-      return res.redirect(301, canonicalPath);
-    }
-
     const title = `${art.title} - सारादेश`;
-    const description = art.subtitle || (art.content ? art.content.substring(0, 160).replace(/\n/g, " ") : "ताज़ा हिंदी समाचार");
+    const description = art.subtitle || (art.content ? art.content.substring(0, 160).replace(/\n/g, " ") : "सारादेश पर पढ़ें ताज़ा और विश्वसनीय हिंदी खबरें।");
     const image = art.image || `https://${domain}/saradesh-logo.png`;
     const officialLogo = `https://${domain}/saradesh-logo.png`;
     const pubDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
@@ -3457,10 +3528,10 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
           "height": 120
         }
       },
-      "articleSection": art.category || "मुख्य समाचार",
-      "articleBody": art.content,
+      "articleSection": art.category || "national",
+      "articleBody": art.content || "",
       "inLanguage": "hi",
-      "keywords": (art.tags || []).join(", ")
+      "keywords": (art.tags && art.tags.length > 0) ? art.tags.join(", ") : "सारादेश, हिंदी समाचार, न्यूज़"
     };
 
     const breadcrumbLd = {
@@ -3476,7 +3547,7 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
         {
           "@type": "ListItem",
           "position": 2,
-          "name": art.category || "समाचार",
+          "name": art.category || "national",
           "item": `https://${domain}/${art.category || "national"}`
         },
         {

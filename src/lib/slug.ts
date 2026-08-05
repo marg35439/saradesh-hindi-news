@@ -336,7 +336,12 @@ export function getArticleUrl(
   // If article.id is already formatted like 'art-123', ensure clean dash joining
   const cleanId = String(article.id).trim();
 
-  const path = `/${cat}/${cleanSlug}-${cleanId}`;
+  // If cleanSlug already ends with or equals cleanId, don't append cleanId twice
+  let path = `/${cat}/${cleanSlug}-${cleanId}`;
+  if (cleanSlug === cleanId || cleanSlug.endsWith(`-${cleanId}`)) {
+    path = `/${cat}/${cleanSlug}`;
+  }
+
   if (domainPrefix) {
     const cleanDomain = domainPrefix.replace(/\/+$/, "");
     return `${cleanDomain}${path}`;
