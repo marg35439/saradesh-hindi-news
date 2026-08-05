@@ -30,6 +30,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   useEffect(() => {
     const siteName = "सारादेश";
     const defaultDomain = "https://saradesh.in";
+    const officialLogo = "https://saradesh.in/saradesh-logo.png";
     const defaultImage = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=1200&auto=format&fit=crop";
     const defaultDescription = "सारादेश पर पढ़ें भारत, राज्य, दुनिया, राजनीति, खेल, व्यापार, मनोरंजन, टेक्नोलॉजी और अन्य श्रेणियों की ताज़ा और विश्वसनीय हिंदी खबरें।";
 
@@ -42,7 +43,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     if (article && article.id) {
       isArticle = true;
       metaTitle = `${article.title || "समाचार"} - ${siteName}`;
-      metaDescription = article.subtitle || (article.content ? article.content.substring(0, 160).replace(/\n/g, " ") + "..." : defaultDescription);
+      metaDescription = article.subtitle || (article.content ? article.content.substring(0, 160).replace(/\n/g, " ") : defaultDescription);
       metaImage = article.image || defaultImage;
       currentUrl = getArticleUrl(article, defaultDomain);
     } else if (categoryName) {
@@ -141,14 +142,16 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
           "@type": "WebPage",
           "@id": currentUrl
         },
+        "url": currentUrl,
         "headline": article.title,
+        "description": article.subtitle || metaDescription,
         "image": [article.image || defaultImage],
         "datePublished": pubDate,
         "dateModified": pubDate,
         "author": {
           "@type": "Person",
-          "name": article.author || "सम्पादकीय टीम",
-          "url": `${defaultDomain}/?author=${encodeURIComponent(article.author || "सम्पादकीय टीम")}`
+          "name": article.author || "सारादेश सम्पादकीय टीम",
+          "url": `${defaultDomain}/?author=${encodeURIComponent(article.author || "सारादेश सम्पादकीय टीम")}`
         },
         "publisher": {
           "@type": "NewsMediaOrganization",
@@ -156,10 +159,12 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
           "url": defaultDomain,
           "logo": {
             "@type": "ImageObject",
-            "url": defaultImage
+            "url": officialLogo,
+            "width": 600,
+            "height": 120
           }
         },
-        "description": article.subtitle || metaDescription,
+        "articleSection": article.category || "मुख्य समाचार",
         "articleBody": article.content,
         "inLanguage": "hi",
         "keywords": (article.tags || []).join(", ")

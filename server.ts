@@ -3424,7 +3424,8 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
 
     const title = `${art.title} - सारादेश`;
     const description = art.subtitle || (art.content ? art.content.substring(0, 160).replace(/\n/g, " ") : "ताज़ा हिंदी समाचार");
-    const image = art.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200";
+    const image = art.image || `https://${domain}/saradesh-logo.png`;
+    const officialLogo = `https://${domain}/saradesh-logo.png`;
     const pubDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
 
     const jsonLd = {
@@ -3434,14 +3435,16 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
         "@type": "WebPage",
         "@id": fullCanonicalUrl
       },
+      "url": fullCanonicalUrl,
       "headline": art.title,
+      "description": description,
       "image": [image],
       "datePublished": pubDate,
       "dateModified": pubDate,
       "author": {
         "@type": "Person",
-        "name": art.author || "सम्पादकीय टीम",
-        "url": `https://${domain}/?author=${encodeURIComponent(art.author || "सम्पादकीय टीम")}`
+        "name": art.author || "सारादेश सम्पादकीय टीम",
+        "url": `https://${domain}/?author=${encodeURIComponent(art.author || "सारादेश सम्पादकीय टीम")}`
       },
       "publisher": {
         "@type": "NewsMediaOrganization",
@@ -3449,12 +3452,40 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
         "url": `https://${domain}`,
         "logo": {
           "@type": "ImageObject",
-          "url": image
+          "url": officialLogo,
+          "width": 600,
+          "height": 120
         }
       },
-      "description": description,
+      "articleSection": art.category || "मुख्य समाचार",
       "articleBody": art.content,
-      "inLanguage": "hi"
+      "inLanguage": "hi",
+      "keywords": (art.tags || []).join(", ")
+    };
+
+    const breadcrumbLd = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "होम",
+          "item": `https://${domain}`
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": art.category || "समाचार",
+          "item": `https://${domain}/${art.category || "national"}`
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": art.title,
+          "item": fullCanonicalUrl
+        }
+      ]
     };
 
     let indexPath = path.join(process.cwd(), "index.html");
@@ -3466,17 +3497,21 @@ app.get("/:category/:slugAndId", async (req, res, next) => {
 
     let injectedHtml = htmlTemplate
       .replace(/<title>.*?<\/title>/gi, `<title>${escapeXml(title)}</title>`)
+      .replace(/<meta name="title" content=".*?"\s*\/?>/gi, `<meta name="title" content="${escapeXml(title)}" />`)
       .replace(/<meta name="description" content=".*?"\s*\/?>/gi, `<meta name="description" content="${escapeXml(description)}" />`)
+      .replace(/<meta property="og:type" content=".*?"\s*\/?>/gi, `<meta property="og:type" content="article" />`)
       .replace(/<meta property="og:title" content=".*?"\s*\/?>/gi, `<meta property="og:title" content="${escapeXml(title)}" />`)
       .replace(/<meta property="og:description" content=".*?"\s*\/?>/gi, `<meta property="og:description" content="${escapeXml(description)}" />`)
       .replace(/<meta property="og:image" content=".*?"\s*\/?>/gi, `<meta property="og:image" content="${escapeXml(image)}" />`)
-      .replace(/<meta property="og:url" content=".*?"\s*\/?>/gi, `<meta property="og:url" content="${fullCanonicalUrl}" />`);
+      .replace(/<meta property="og:url" content=".*?"\s*\/?>/gi, `<meta property="og:url" content="${fullCanonicalUrl}" />`)
+      .replace(/<meta name="twitter:title" content=".*?"\s*\/?>/gi, `<meta name="twitter:title" content="${escapeXml(title)}" />`)
+      .replace(/<meta name="twitter:description" content=".*?"\s*\/?>/gi, `<meta name="twitter:description" content="${escapeXml(description)}" />`)
+      .replace(/<meta name="twitter:image" content=".*?"\s*\/?>/gi, `<meta name="twitter:image" content="${escapeXml(image)}" />`)
+      .replace(/<link rel="canonical" id="canonical-url-link" href=".*?"\s*\/?>/gi, `<link rel="canonical" id="canonical-url-link" href="${fullCanonicalUrl}" />`);
 
     const headInjection = `
-      <link rel="canonical" href="${fullCanonicalUrl}" />
-      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-      <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-      <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+      <script type="application/ld+json" id="ssr-newsarticle-schema">${JSON.stringify(jsonLd)}</script>
+      <script type="application/ld+json" id="ssr-breadcrumb-schema">${JSON.stringify(breadcrumbLd)}</script>
     `;
 
     injectedHtml = injectedHtml.replace("</head>", `${headInjection}</head>`);
