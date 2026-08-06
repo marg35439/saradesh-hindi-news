@@ -33,6 +33,18 @@
       "destination": "/api"
     },
     {
+      "source": "/article/:id*",
+      "destination": "/api"
+    },
+    {
+      "source": "/:category/:slug",
+      "destination": "/api"
+    },
+    {
+      "source": "/:category/:subcategory/:slug",
+      "destination": "/api"
+    },
+    {
       "source": "/((?!api/|sitemap|news-sitemap|robots|ads|rss|feed).*)",
       "destination": "/index.html"
     }
