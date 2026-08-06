@@ -1457,6 +1457,41 @@ app.get("/api/news/:id", async (req, res) => {
   }
 });
 
+// GET /api/article-image/:id - Serves binary image for article hero image (decodes base64 or redirects to URL)
+app.get("/api/article-image/:id", async (req, res) => {
+  const articleId = req.params.id;
+  try {
+    let artImage: string | null = null;
+    const docRef = doc(db, "articles", articleId);
+    const docSnap = await getDoc(docRef).catch(() => null);
+    if (docSnap && docSnap.exists()) {
+      artImage = (docSnap.data() as Article).image || null;
+    }
+    if (!artImage) {
+      const defItem = FALLBACK_NEWS.find(d => d && d.id === articleId);
+      if (defItem && defItem.image) artImage = defItem.image;
+    }
+    if (!artImage) {
+      return res.redirect(302, "/saradesh-logo.png");
+    }
+    if (artImage.startsWith("data:image/")) {
+      const parts = artImage.split(",");
+      const mimeMatch = parts[0].match(/data:(image\/[a-zA-Z0-9\+\-]+);base64/);
+      const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const imgBuffer = Buffer.from(parts[1], "base64");
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.status(200).send(imgBuffer);
+    }
+    if (artImage.startsWith("http://") || artImage.startsWith("https://")) {
+      return res.redirect(302, artImage);
+    }
+    return res.redirect(302, "/saradesh-logo.png");
+  } catch (err) {
+    return res.redirect(302, "/saradesh-logo.png");
+  }
+});
+
 // POST /api/gemini/generate-slug - Generate natural English SEO slug using AI analyzing title & content
 app.post("/api/gemini/generate-slug", async (req, res) => {
   try {
@@ -3462,9 +3497,10 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
     const rawDesc = (art as any).metaDescription || art.subtitle || (art as any).summary || art.content || "सारादेश पर पढ़ें ताज़ा और विश्वसनीय हिंदी खबरें।";
     const description = rawDesc.substring(0, 160).replace(/\n/g, " ").trim();
 
+    // Image URL: If art.image is base64, serve via article-image proxy endpoint so it points to article hero image, never site logo
     let image = art.image || `https://${domain}/saradesh-logo.png`;
     if (image.startsWith("data:")) {
-      image = `https://${domain}/saradesh-logo.png`;
+      image = `https://${domain}/api/article-image/${art.id}`;
     }
     const officialLogo = `https://${domain}/saradesh-logo.png`;
     
@@ -3476,7 +3512,11 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
 
     // Extract author, category, keywords directly from article object properties
     const authorName = art.author || (art as any).authorName || "सारादेश सम्पादकीय टीम";
-    const articleCategory = art.category || "national";
+    
+    // Breadcrumb category URL and articleSection: match the canonical category slug used in the article URL (e.g. technology instead of tech)
+    const categorySlug = getMainCategorySlug(art.category, (art as any).mainCategory);
+    const articleCategory = categorySlug || art.category || "national";
+    
     const rawKeywords = (art as any).keywords || (art.tags && art.tags.length > 0 ? art.tags.join(", ") : "सारादेश, हिंदी समाचार, न्यूज़");
     const keywordsStr = Array.isArray(rawKeywords) ? rawKeywords.join(", ") : rawKeywords;
 
