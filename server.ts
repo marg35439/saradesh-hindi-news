@@ -3154,10 +3154,10 @@ app.get("/robots.txt", (req, res) => {
   res.send(`User-agent: *
 Allow: /
 
-Sitemap: https://saradesh.in/sitemap.xml
-Sitemap: https://saradesh.in/news-sitemap.xml
-Sitemap: https://saradesh.in/sitemap-index.xml
-Sitemap: https://saradesh.in/rss.xml
+Sitemap: https://www.saradesh.in/sitemap.xml
+Sitemap: https://www.saradesh.in/news-sitemap.xml
+Sitemap: https://www.saradesh.in/sitemap-index.xml
+Sitemap: https://www.saradesh.in/rss.xml
 `);
 });
 
@@ -3167,7 +3167,7 @@ app.get("/ads.txt", (req, res) => {
 });
 
 async function generateSitemapXml(hostHeader?: string): Promise<string> {
-  const domain = "saradesh.in";
+  const domain = "www.saradesh.in";
   const baseUrl = `https://${domain}`;
   const categories = ["national", "state", "crime", "business", "sports", "entertainment", "tech", "lifestyle", "international", "job", "education", "religion", "astrology", "schemes"];
   const policyPages = ["about-us", "editorial-policy", "corrections-policy", "fact-check-policy", "publisher-info", "contact-us"];
@@ -3246,7 +3246,7 @@ async function generateSitemapXml(hostHeader?: string): Promise<string> {
 }
 
 async function generateNewsSitemapXml(): Promise<string> {
-  const domain = "saradesh.in";
+  const domain = "www.saradesh.in";
   const baseUrl = `https://${domain}`;
   const articlesList = await fetchArticlesFromFirestoreWithTimeout(2500);
 
@@ -3291,7 +3291,7 @@ async function generateNewsSitemapXml(): Promise<string> {
 }
 
 async function generateRssFeedXml(): Promise<string> {
-  const domain = "saradesh.in";
+  const domain = "www.saradesh.in";
   const baseUrl = `https://${domain}`;
   const articlesList = await fetchArticlesFromFirestoreWithTimeout(2500);
 
@@ -3375,11 +3375,11 @@ app.get("/sitemap-index.xml", (req, res) => {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://saradesh.in/sitemap.xml</loc>
+    <loc>https://www.saradesh.in/sitemap.xml</loc>
     <lastmod>${currentDate}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://saradesh.in/news-sitemap.xml</loc>
+    <loc>https://www.saradesh.in/news-sitemap.xml</loc>
     <lastmod>${currentDate}</lastmod>
   </sitemap>
 </sitemapindex>`;
@@ -3435,7 +3435,7 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
   }
 
   try {
-    const domain = "saradesh.in";
+    const domain = "www.saradesh.in";
     let art: Article | null = null;
 
     // 1. Try parseArticleUrlPath

@@ -1965,7 +1965,7 @@ export default function AdminPanel() {
                     </label>
                     <div className="flex items-center bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-neutral-600 shadow-xs">
                       <span className="text-neutral-400 font-semibold select-none shrink-0">
-                        saradesh.in/{getMainCategorySlug(category)}/
+                        www.saradesh.in/{getMainCategorySlug(category)}/
                       </span>
                       <input
                         type="text"

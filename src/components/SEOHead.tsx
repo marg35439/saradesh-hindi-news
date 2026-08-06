@@ -29,8 +29,8 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
 }) => {
   useEffect(() => {
     const siteName = "सारादेश";
-    const defaultDomain = "https://saradesh.in";
-    const officialLogo = "https://saradesh.in/saradesh-logo.png";
+    const defaultDomain = "https://www.saradesh.in";
+    const officialLogo = "https://www.saradesh.in/saradesh-logo.png";
     const defaultImage = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=1200&auto=format&fit=crop";
     const defaultDescription = "सारादेश पर पढ़ें भारत, राज्य, दुनिया, राजनीति, खेल, व्यापार, मनोरंजन, टेक्नोलॉजी और अन्य श्रेणियों की ताज़ा और विश्वसनीय हिंदी खबरें।";
 
