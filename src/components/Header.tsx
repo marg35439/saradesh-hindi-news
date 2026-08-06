@@ -109,6 +109,8 @@ export default function Header({ onAdminClick, isAdminMode, onHomeClick }: Heade
             <div className="flex items-center gap-1.5 bg-neutral-800 text-white py-0.5 px-2 rounded-md border border-neutral-700">
               <MapPin className="w-3.5 h-3.5 text-red-400" />
               <select 
+                id="header-city-select"
+                aria-label="मौसम स्थान चुनें"
                 value={selectedCity} 
                 onChange={(e) => setSelectedCity(e.target.value)}
                 className="bg-transparent text-white font-medium focus:outline-none cursor-pointer border-none py-0 px-1 text-xs"

@@ -81,6 +81,8 @@ export default function MainMenu({
               return (
                 <button
                   key={cat.key}
+                  type="button"
+                  aria-label={`श्रेणी ${cat.hindiName}`}
                   onClick={() => {
                     if (onSelectSubcategory) onSelectSubcategory(null);
                     onSelectCategory(cat.key);
@@ -100,7 +102,9 @@ export default function MainMenu({
           {/* Search bar layout */}
           <div className="relative flex items-center shrink-0 w-full lg:w-72">
             <input
+              id="search-news-input"
               type="text"
+              aria-label="खबरें खोजें"
               placeholder="खबरें खोजें (उदा: इसरो, बजट)..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
@@ -109,8 +113,10 @@ export default function MainMenu({
             <Search className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none" />
             {searchQuery && (
               <button
+                type="button"
+                aria-label="खोज साफ़ करें"
                 onClick={() => onSearchChange("")}
-                className="absolute right-2.5 p-1 text-xs text-gray-400 hover:text-gray-600 font-bold focus:outline-none"
+                className="absolute right-2.5 p-1 text-xs text-gray-400 hover:text-gray-600 font-bold focus:outline-none cursor-pointer"
               >
                 ✕
               </button>

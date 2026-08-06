@@ -548,6 +548,8 @@ export default function ArticleDetail({
           <p className="text-xs text-neutral-400 mt-1">अपने विचार साझा करने के लिए लेख को लाइक करें या नीचे टिप्पणी दें।</p>
         </div>
         <button
+          type="button"
+          aria-label="लाइक करें"
           onClick={handleLike}
           disabled={hasLiked}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
@@ -596,8 +598,9 @@ export default function ArticleDetail({
           
           <div className="grid grid-cols-1 gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-neutral-600 mb-1">आपका नाम :</label>
+              <label htmlFor="comment-author-input" className="block text-[11px] font-bold text-neutral-600 mb-1">आपका नाम :</label>
               <input
+                id="comment-author-input"
                 type="text"
                 required
                 value={commentName}
@@ -607,8 +610,9 @@ export default function ArticleDetail({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-neutral-600 mb-1">टिप्पणी :</label>
+              <label htmlFor="comment-content-textarea" className="block text-[11px] font-bold text-neutral-600 mb-1">टिप्पणी :</label>
               <textarea
+                id="comment-content-textarea"
                 required
                 rows={3}
                 value={commentText}

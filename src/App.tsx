@@ -1,23 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Newspaper, Flame, Heart, MessageSquare, Eye, ArrowRight, CornerDownRight, RefreshCw, Layers, Check, ThumbsUp, MapPin, Sun, Award, HelpCircle, Cloud, CloudRain, CloudSun, Grid, ListFilter, Bookmark, Radio, Briefcase, GraduationCap, Sparkles, Landmark, Compass, ChevronRight, Shield, TrendingUp, TrendingDown, BarChart3, FileText, Scale, CheckSquare, Building, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Header from "./components/Header";
 import BreakingNews from "./components/BreakingNews";
 import MainMenu from "./components/MainMenu";
 import ArticleCard from "./components/ArticleCard";
-import ArticleDetail from "./components/ArticleDetail";
-import AdminPanel from "./components/AdminPanel";
-import AudioNewsReader from "./components/AudioNewsReader";
-import SavedArticlesModal from "./components/SavedArticlesModal";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { SEOHead } from "./components/SEOHead";
-import { AuthorProfile } from "./components/AuthorProfile";
-import { PolicyPages } from "./components/PolicyPages";
 import { AdBanner } from "./components/AdBanner";
 import { initGA, logPageView } from "./lib/analytics";
 import { Article, CategoryKey, CATEGORIES, STATES, SUBCATEGORIES } from "./types";
 import { fetchNewsList } from "./lib/newsClient";
 import { getArticleUrl, parseArticleUrlPath } from "./lib/slug";
+
+// Code-split non-critical views with React.lazy
+const AdminPanel = lazy(() => import("./components/AdminPanel"));
+const ArticleDetail = lazy(() => import("./components/ArticleDetail"));
+const AudioNewsReader = lazy(() => import("./components/AudioNewsReader"));
+const SavedArticlesModal = lazy(() => import("./components/SavedArticlesModal"));
+const AuthorProfile = lazy(() => import("./components/AuthorProfile").then(m => ({ default: m.AuthorProfile })));
+const PolicyPages = lazy(() => import("./components/PolicyPages").then(m => ({ default: m.PolicyPages })));
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -529,7 +531,9 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.2 }}
             >
-              <AdminPanel />
+              <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-xs text-neutral-400 font-sans">एडमिन पैनल लोड हो रहा है...</div>}>
+                <AdminPanel />
+              </Suspense>
             </motion.div>
           ) 
           
@@ -542,33 +546,35 @@ export default function App() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ArticleDetail 
-                articleId={selectedArticleId} 
-                onBack={() => {
-                  if (window.history.length > 1) {
-                    window.history.back();
-                  } else {
+              <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-xs text-neutral-400 font-sans">खबर लोड हो रही है...</div>}>
+                <ArticleDetail 
+                  articleId={selectedArticleId} 
+                  onBack={() => {
+                    if (window.history.length > 1) {
+                      window.history.back();
+                    } else {
+                      setSelectedArticleId(null);
+                      try {
+                        window.history.pushState({}, "", window.location.pathname);
+                      } catch {}
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  isBookmarked={savedArticleIds.includes(selectedArticleId)}
+                  onToggleBookmark={(e, art) => toggleBookmark(e, art)}
+                  allArticles={articles}
+                  onArticleSelect={(art) => handleArticleClick(art)}
+                  onAuthorClick={(authorName) => {
                     setSelectedArticleId(null);
+                    setSelectedPolicyPage(null);
+                    setSelectedAuthor(authorName);
                     try {
-                      window.history.pushState({}, "", window.location.pathname);
+                      window.history.pushState({}, "", "?author=" + encodeURIComponent(authorName));
                     } catch {}
                     window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
-                isBookmarked={savedArticleIds.includes(selectedArticleId)}
-                onToggleBookmark={(e, art) => toggleBookmark(e, art)}
-                allArticles={articles}
-                onArticleSelect={(art) => handleArticleClick(art)}
-                onAuthorClick={(authorName) => {
-                  setSelectedArticleId(null);
-                  setSelectedPolicyPage(null);
-                  setSelectedAuthor(authorName);
-                  try {
-                    window.history.pushState({}, "", "?author=" + encodeURIComponent(authorName));
-                  } catch {}
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-              />
+                  }}
+                />
+              </Suspense>
             </motion.div>
           )
 
@@ -582,23 +588,25 @@ export default function App() {
               transition={{ duration: 0.2 }}
             >
               <SEOHead authorName={selectedAuthor} />
-              <AuthorProfile
-                authorName={selectedAuthor}
-                articles={articles}
-                onArticleClick={(art) => handleArticleClick(art)}
-                onBack={() => {
-                  setSelectedAuthor(null);
-                  try {
-                    window.history.pushState({}, "", "/");
-                  } catch {}
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                onBookmarkToggle={(artId) => {
-                  const art = articles.find(a => a.id === artId);
-                  if (art) toggleBookmark(new MouseEvent("click") as any, art);
-                }}
-                savedArticleIds={savedArticleIds}
-              />
+              <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-xs text-neutral-400 font-sans">लेखक प्रोफ़ाइल लोड हो रही है...</div>}>
+                <AuthorProfile
+                  authorName={selectedAuthor}
+                  articles={articles}
+                  onArticleClick={(art) => handleArticleClick(art)}
+                  onBack={() => {
+                    setSelectedAuthor(null);
+                    try {
+                      window.history.pushState({}, "", "/");
+                    } catch {}
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onBookmarkToggle={(artId) => {
+                    const art = articles.find(a => a.id === artId);
+                    if (art) toggleBookmark(new MouseEvent("click") as any, art);
+                  }}
+                  savedArticleIds={savedArticleIds}
+                />
+              </Suspense>
             </motion.div>
           )
 
@@ -666,16 +674,18 @@ export default function App() {
                   />
                 );
               })()}
-              <PolicyPages
-                pageType={selectedPolicyPage}
-                onBack={() => {
-                  setSelectedPolicyPage(null);
-                  try {
-                    window.history.pushState({}, "", "/");
-                  } catch {}
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-              />
+              <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-xs text-neutral-400 font-sans">पेज लोड हो रहा है...</div>}>
+                <PolicyPages
+                  pageType={selectedPolicyPage}
+                  onBack={() => {
+                    setSelectedPolicyPage(null);
+                    try {
+                      window.history.pushState({}, "", "/");
+                    } catch {}
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
+              </Suspense>
             </motion.div>
           )
           
@@ -1532,19 +1542,21 @@ export default function App() {
       </footer>
 
       {/* Saved Articles Drawer Modal */}
-      <SavedArticlesModal
-        isOpen={isSavedModalOpen}
-        onClose={() => setIsSavedModalOpen(false)}
-        savedArticles={articles.filter(a => savedArticleIds.includes(a.id))}
-        onArticleClick={(art) => {
-          setSelectedArticleId(art.id);
-          setIsSavedModalOpen(false);
-          setIsAdminMode(false);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-        onRemoveBookmark={removeBookmark}
-        onClearAll={clearAllBookmarks}
-      />
+      <Suspense fallback={null}>
+        <SavedArticlesModal
+          isOpen={isSavedModalOpen}
+          onClose={() => setIsSavedModalOpen(false)}
+          savedArticles={articles.filter(a => savedArticleIds.includes(a.id))}
+          onArticleClick={(art) => {
+            setSelectedArticleId(art.id);
+            setIsSavedModalOpen(false);
+            setIsAdminMode(false);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          onRemoveBookmark={removeBookmark}
+          onClearAll={clearAllBookmarks}
+        />
+      </Suspense>
 
       {/* Mobile Floating Bottom Bar */}
       <MobileBottomNav

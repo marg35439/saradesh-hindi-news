@@ -510,8 +510,9 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-neutral-700 mb-1">आपका नाम *</label>
+                      <label htmlFor="contact-name-input" className="block text-xs font-bold text-neutral-700 mb-1">आपका नाम *</label>
                       <input
+                        id="contact-name-input"
                         type="text"
                         required
                         value={formData.name}
@@ -520,8 +521,9 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-neutral-700 mb-1">ईमेल पता *</label>
+                      <label htmlFor="contact-email-input" className="block text-xs font-bold text-neutral-700 mb-1">ईमेल पता *</label>
                       <input
+                        id="contact-email-input"
                         type="email"
                         required
                         value={formData.email}
@@ -530,8 +532,9 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-neutral-700 mb-1">विषय *</label>
+                      <label htmlFor="contact-subject-input" className="block text-xs font-bold text-neutral-700 mb-1">विषय *</label>
                       <input
+                        id="contact-subject-input"
                         type="text"
                         required
                         value={formData.subject}
@@ -540,8 +543,9 @@ export const PolicyPages: React.FC<PolicyPagesProps> = ({ pageType, onBack }) =>
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-neutral-700 mb-1">संदेश *</label>
+                      <label htmlFor="contact-message-textarea" className="block text-xs font-bold text-neutral-700 mb-1">संदेश *</label>
                       <textarea
+                        id="contact-message-textarea"
                         rows={3}
                         required
                         value={formData.message}
