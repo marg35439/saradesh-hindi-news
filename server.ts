@@ -3462,7 +3462,10 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
     const rawDesc = (art as any).metaDescription || art.subtitle || (art as any).summary || art.content || "सारादेश पर पढ़ें ताज़ा और विश्वसनीय हिंदी खबरें।";
     const description = rawDesc.substring(0, 160).replace(/\n/g, " ").trim();
 
-    const image = art.image || `https://${domain}/saradesh-logo.png`;
+    let image = art.image || `https://${domain}/saradesh-logo.png`;
+    if (image.startsWith("data:")) {
+      image = `https://${domain}/saradesh-logo.png`;
+    }
     const officialLogo = `https://${domain}/saradesh-logo.png`;
     
     // Extract published & modified date directly from article object properties
@@ -3548,6 +3551,7 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
       .replace(/<title>.*?<\/title>/gi, `<title>${escapeXml(title)}</title>`)
       .replace(/<meta name="title" content=".*?"\s*\/?>/gi, `<meta name="title" content="${escapeXml(title)}" />`)
       .replace(/<meta name="description" content=".*?"\s*\/?>/gi, `<meta name="description" content="${escapeXml(description)}" />`)
+      .replace(/<meta name="author" content=".*?"\s*\/?>/gi, `<meta name="author" content="${escapeXml(authorName)}" />`)
       .replace(/<meta property="og:type" content=".*?"\s*\/?>/gi, `<meta property="og:type" content="article" />`)
       .replace(/<meta property="og:title" content=".*?"\s*\/?>/gi, `<meta property="og:title" content="${escapeXml(title)}" />`)
       .replace(/<meta property="og:description" content=".*?"\s*\/?>/gi, `<meta property="og:description" content="${escapeXml(description)}" />`)
