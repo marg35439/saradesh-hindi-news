@@ -284,8 +284,8 @@ export default function AdminPanel() {
   const [pubAddress, setPubAddress] = useState("");
   const [pubOwnership, setPubOwnership] = useState("");
 
-  const [conEditorialEmail, setConEditorialEmail] = useState("editor@saradesh.in");
-  const [conSupportEmail, setConSupportEmail] = useState("contact@saradesh.in");
+  const [conEditorialEmail, setConEditorialEmail] = useState("bst490@gmail.com");
+  const [conSupportEmail, setConSupportEmail] = useState("bst490@gmail.com");
   const [conPhone, setConPhone] = useState("");
   const [conAddress, setConAddress] = useState("");
 
@@ -1307,7 +1307,7 @@ export default function AdminPanel() {
               <input
                 type="email"
                 required
-                placeholder="admin@saradesh.in"
+                placeholder="bst490@gmail.com"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 className="w-full text-sm p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none font-sans"
@@ -3408,7 +3408,7 @@ export default function AdminPanel() {
                   <input
                     type="email"
                     required
-                    placeholder="editor@saradesh.in"
+                    placeholder="bst490@gmail.com"
                     value={newUserEmail}
                     onChange={(e) => setNewUserEmail(e.target.value)}
                     className="w-full text-xs p-3 rounded-xl bg-neutral-50 border focus:bg-white focus:border-[#ff6f00] outline-none"
@@ -3661,7 +3661,7 @@ export default function AdminPanel() {
                     <label className="block text-xs font-bold text-neutral-700 mb-1">संपादकीय ईमेल (Editorial Email):</label>
                     <input
                       type="email"
-                      placeholder="editor@saradesh.in"
+                      placeholder="bst490@gmail.com"
                       value={conEditorialEmail}
                       onChange={(e) => setConEditorialEmail(e.target.value)}
                       className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
@@ -3672,7 +3672,7 @@ export default function AdminPanel() {
                     <label className="block text-xs font-bold text-neutral-700 mb-1">सपोर्ट / अन्य ईमेल (Support Email):</label>
                     <input
                       type="email"
-                      placeholder="contact@saradesh.in"
+                      placeholder="bst490@gmail.com"
                       value={conSupportEmail}
                       onChange={(e) => setConSupportEmail(e.target.value)}
                       className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"
@@ -3856,7 +3856,7 @@ export default function AdminPanel() {
                   <label className="block text-xs font-bold text-neutral-700 mb-1">ऑथर ईमेल (Author Email):</label>
                   <input
                     type="email"
-                    placeholder="उदा: reporter@saradesh.in"
+                    placeholder="उदा: bst490@gmail.com"
                     value={authorFormEmail}
                     onChange={(e) => setAuthorFormEmail(e.target.value)}
                     className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#ff6f00]"

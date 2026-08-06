@@ -875,7 +875,7 @@ uppbpb.gov.in पर जाकर अपना रजिस्ट्रेशन
 - **मकर व कुंभ राशि:** जल में काले तिल मिलाकर अर्पित करें।`,
     category: "astrology",
     image: "https://images.unsplash.com/photo-1567157577867-05ccb1388e66?auto=format&fit=crop&w=800&q=80",
-    author: "पंडित राधेश्याम शास्त्री",
+    author: "धर्म व ज्योतिष डेस्क",
     date: "27 जुलाई 2026",
     readTime: 3,
     views: 8900,

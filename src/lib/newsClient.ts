@@ -312,8 +312,8 @@ export async function fetchSiteSettingsClient(): Promise<SiteSettings> {
       ownershipDetails: ""
     },
     contactUs: {
-      editorialEmail: "editor@saradesh.in",
-      supportEmail: "contact@saradesh.in",
+      editorialEmail: "bst490@gmail.com",
+      supportEmail: "bst490@gmail.com",
       phone: "",
       address: ""
     }

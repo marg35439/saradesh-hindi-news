@@ -25,7 +25,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
-  const [selectedPolicyPage, setSelectedPolicyPage] = useState<"editorial-policy" | "corrections-policy" | "fact-check-policy" | "publisher-info" | "about-us" | "contact-us" | null>(null);
+  const [selectedPolicyPage, setSelectedPolicyPage] = useState<"editorial-policy" | "corrections-policy" | "fact-check-policy" | "publisher-info" | "about-us" | "contact-us" | "privacy-policy" | "terms-and-conditions" | "disclaimer" | "editorial-team" | null>(null);
   
   // Dense compact view toggle
   const [isCompactView, setIsCompactView] = useState(false);
@@ -226,7 +226,19 @@ export default function App() {
     if (initialAuthor) {
       setSelectedAuthor(initialAuthor);
     }
-    const initialPage = params.get("page");
+    const pathPolicyMap: Record<string, any> = {
+      "/privacy-policy": "privacy-policy",
+      "/terms-and-conditions": "terms-and-conditions",
+      "/disclaimer": "disclaimer",
+      "/editorial-team": "editorial-team",
+      "/about-us": "about-us",
+      "/editorial-policy": "editorial-policy",
+      "/corrections-policy": "corrections-policy",
+      "/fact-check-policy": "fact-check-policy",
+      "/publisher-info": "publisher-info",
+      "/contact-us": "contact-us"
+    };
+    const initialPage = params.get("page") || pathPolicyMap[window.location.pathname];
     if (initialPage) {
       setSelectedPolicyPage(initialPage as any);
     }
@@ -251,7 +263,7 @@ export default function App() {
       }
 
       setSelectedAuthor(p.get("author") || null);
-      setSelectedPolicyPage((p.get("page") as any) || null);
+      setSelectedPolicyPage((p.get("page") as any) || pathPolicyMap[window.location.pathname] || null);
 
       setIsAdminMode(p.get("admin") === "true");
       logPageView(window.location.pathname + window.location.search);
@@ -599,7 +611,61 @@ export default function App() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <SEOHead pageTitle={selectedPolicyPage.replace("-", " ").toUpperCase()} />
+              {(() => {
+                const seoTitles: Record<string, { title: string; desc: string }> = {
+                  "privacy-policy": {
+                    title: "गोपनीयता नीति (Privacy Policy)",
+                    desc: "सारादेश (https://www.saradesh.in) की आधिकारिक गोपनीयता नीति। जानें हम आपकी व्यक्तिगत जानकारी, कुकीज़, एनालिटिक्स, गूगल एडसेंस और डेटा सुरक्षा को कैसे सुरक्षित रखते हैं।"
+                  },
+                  "terms-and-conditions": {
+                    title: "नियम एवं शर्तें (Terms & Conditions)",
+                    desc: "सारादेश (https://www.saradesh.in) का उपयोग करने के लिए नियम एवं शर्तें। कॉपीराइट, बौद्धिक संपदा, उपयोगकर्ता जिम्मेदारियां, दायित्व सीमा और भारतीय कानून संबंधी नियम।"
+                  },
+                  "disclaimer": {
+                    title: "अस्वीकरण (Disclaimer)",
+                    desc: "सारादेश (https://www.saradesh.in) का आधिकारिक अस्वीकरण। खबरों की सटीकता, वित्तीय, मेडिकल, कानूनी सलाह से संबंधित जानकारी और प्रायोजित सामग्री डिस्क्लोजर।"
+                  },
+                  "editorial-team": {
+                    title: "हमारी संपादकीय टीम (Editorial Team)",
+                    desc: "सारादेश (https://www.saradesh.in) की अनुभवी और निष्पक्ष संपादकीय टीम से मिलें। प्रधान संपादक, फैक्ट-चेक डेस्क, राजनीति, खेल, टेक व मनोरंजन संपादकों की जानकारी।"
+                  },
+                  "about-us": {
+                    title: "हमारे बारे में (About Us)",
+                    desc: "सारादेश (https://www.saradesh.in) - भारत का विश्वसनीय हिंदी डिजिटल समाचार पोर्टल।"
+                  },
+                  "editorial-policy": {
+                    title: "संपादकीय नीति (Editorial Policy)",
+                    desc: "सारादेश की निष्पक्ष और पारदर्शी संपादकीय नीतियां एवं पत्रकारिता के सिद्धांत।"
+                  },
+                  "corrections-policy": {
+                    title: "सुधार नीति (Corrections Policy)",
+                    desc: "तथ्य सुधार एवं संशोधन संबंधी सारादेश की नीति।"
+                  },
+                  "fact-check-policy": {
+                    title: "फैक्ट चेक नीति (Fact-Check Policy)",
+                    desc: "भ्रामक खबरों व अफ़वाहों के खिलाफ सारादेश की सत्यापन प्रक्रिया।"
+                  },
+                  "publisher-info": {
+                    title: "प्रकाशक एवं स्वामित्व जानकारी (Publisher Info)",
+                    desc: "कंपनी पंजीकरण, स्वामित्व व पारदर्शी विवरण।"
+                  },
+                  "contact-us": {
+                    title: "संपर्क करें (Contact Us)",
+                    desc: "सारादेश संपादकीय टीम एवं आधिकारिक कार्यालय से संपर्क करें।"
+                  }
+                };
+                const info = seoTitles[selectedPolicyPage] || {
+                  title: selectedPolicyPage.replace("-", " ").toUpperCase(),
+                  desc: "सारादेश नीतिगत जानकारी पृष्ठ"
+                };
+                return (
+                  <SEOHead
+                    title={`${info.title} - सारादेश`}
+                    description={info.desc}
+                    url={`https://www.saradesh.in/${selectedPolicyPage}`}
+                  />
+                );
+              })()}
               <PolicyPages
                 pageType={selectedPolicyPage}
                 onBack={() => {
@@ -1402,9 +1468,13 @@ export default function App() {
             <div className="flex flex-wrap gap-2 text-xs mb-4">
               {[
                 { id: "about-us", label: "हमारे बारे में" },
+                { id: "editorial-team", label: "संपादकीय टीम" },
                 { id: "editorial-policy", label: "संपादकीय नीति" },
-                { id: "corrections-policy", label: "सुधार नीति" },
                 { id: "fact-check-policy", label: "फैक्ट चेक नीति" },
+                { id: "corrections-policy", label: "सुधार नीति" },
+                { id: "privacy-policy", label: "गोपनीयता नीति" },
+                { id: "terms-and-conditions", label: "नियम एवं शर्तें" },
+                { id: "disclaimer", label: "अस्वीकरण" },
                 { id: "publisher-info", label: "प्रकाशक जानकारी" },
                 { id: "contact-us", label: "संपर्क करें" }
               ].map((p) => (

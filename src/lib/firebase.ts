@@ -46,7 +46,7 @@ export async function getUserRoleProfile(uid: string, email: string): Promise<Us
 
   const newProfile: UserRoleData = {
     uid,
-    email: email || "unknown@saradesh.in",
+    email: email || "bst490@gmail.com",
     role: initialRole,
     createdAt: new Date().toISOString()
   };
