@@ -328,6 +328,8 @@ export default function ArticleDetail({
                 alt={block.imgCaption || "समाचार चित्र"}
                 className="w-full h-auto max-h-[550px] object-cover hover:scale-101 transition-transform"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             {block.imgCaption && (
@@ -527,6 +529,9 @@ export default function ArticleDetail({
           alt={article.title}
           referrerPolicy="no-referrer"
           className="w-full h-auto object-cover max-h-[460px] mx-auto"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
       </div>

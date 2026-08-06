@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@layer base {
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
 @keyframes marquee {
   0% { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
@@ -13,6 +21,7 @@
   display: flex;
   width: max-content;
   animation: marquee 320s linear infinite;
+  will-change: transform;
 }
 
 .animate-marquee:hover {

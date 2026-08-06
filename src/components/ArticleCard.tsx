@@ -99,6 +99,9 @@ export default function ArticleCard({
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
+              decoding="async"
+              width="48"
+              height="48"
             />
           </div>
 
@@ -160,6 +163,9 @@ export default function ArticleCard({
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           loading="lazy"
+          decoding="async"
+          width="160"
+          height="112"
         />
         {/* Category Tag Overlay */}
         <div className="absolute top-1.5 left-1.5 z-10">

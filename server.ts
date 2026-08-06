@@ -5,6 +5,7 @@ import fsDirect from "fs";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import cors from "cors";
+import compression from "compression";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Article } from "./src/types";
 import { FALLBACK_NEWS } from "./src/data/fallbackNews.js";
@@ -32,6 +33,9 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Enable Brotli/Gzip compression for all HTTP responses
+app.use(compression());
 
 // Enable CORS for all origins and domains
 app.use(cors({
@@ -3603,12 +3607,14 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
       .replace(/<link rel="canonical" id="canonical-url-link" href=".*?"\s*\/?>/gi, `<link rel="canonical" id="canonical-url-link" href="${fullCanonicalUrl}" />`);
 
     const headInjection = `
+      <link rel="preload" as="image" href="${escapeXml(image)}" fetchpriority="high" />
       <script type="application/ld+json" id="ssr-newsarticle-schema">${JSON.stringify(jsonLd)}</script>
       <script type="application/ld+json" id="ssr-breadcrumb-schema">${JSON.stringify(breadcrumbLd)}</script>
     `;
 
     injectedHtml = injectedHtml.replace("</head>", `${headInjection}</head>`);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
     return res.status(200).send(injectedHtml);
   } catch (err) {
     console.error("Error generating article SSR HTML:", err);
@@ -3641,9 +3647,20 @@ async function startServer() {
     });
   } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      maxAge: "1y",
+      immutable: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (req, res) => {
       const distIndex = path.join(distPath, "index.html");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       if (fsDirect.existsSync(distIndex)) {
         res.sendFile(distIndex);
       } else {

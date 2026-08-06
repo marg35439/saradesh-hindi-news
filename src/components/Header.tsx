@@ -56,8 +56,12 @@ export default function Header({ onAdminClick, isAdminMode, onHomeClick }: Heade
     };
 
     updateWeather();
-    // Poll every 25 seconds for dynamic weather changes as requested
-    const weatherInterval = setInterval(updateWeather, 25000);
+    // Poll weather when page is visible (every 3 minutes)
+    const weatherInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        updateWeather();
+      }
+    }, 180000);
 
     return () => clearInterval(weatherInterval);
   }, []);

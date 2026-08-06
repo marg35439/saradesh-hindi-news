@@ -15,6 +15,32 @@ export default defineConfig(() => {
     build: {
       target: ['es2017', 'chrome79', 'firefox78', 'safari13', 'edge79'],
       cssTarget: ['chrome79', 'firefox78', 'safari13', 'edge79'],
+      minify: 'esbuild',
+      cssMinify: true,
+      modulePreload: {
+        polyfill: false,
+      },
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              if (id.includes('motion')) {
+                return 'vendor-motion';
+              }
+              return 'vendor-others';
+            }
+          },
+        },
+      },
     },
     esbuild: {
       target: 'es2017',
