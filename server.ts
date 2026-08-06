@@ -3407,21 +3407,18 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
     const parsed = parseArticleUrlPath(reqPath, new URLSearchParams(req.query as any));
     const cleanId = parsed?.articleId || parsed?.id || (category === "article" ? slugOrId : "");
 
-    // Search in FALLBACK_NEWS & in-memory cache
+    // Search by ID first (in FALLBACK_NEWS or Firestore)
     if (cleanId) {
       art = FALLBACK_NEWS.find((a) => a && a.id === cleanId) || null;
       if (!art) {
         try {
           const docRef = doc(db, "articles", cleanId);
-          const docSnap = await Promise.race([
-            getDoc(docRef),
-            new Promise<null>((r) => setTimeout(() => r(null), 400))
-          ]);
-          if (docSnap && (docSnap as any).exists && (docSnap as any).exists()) {
-            art = (docSnap as any).data() as Article;
+          const docSnap = await getDoc(docRef);
+          if (docSnap && docSnap.exists()) {
+            art = { id: docSnap.id, ...(docSnap.data() as Article) };
           }
         } catch (e) {
-          // Ignore timeout
+          // Ignore error
         }
       }
     }
@@ -3439,51 +3436,17 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
 
       if (!art) {
         try {
+          // Try querying by slug field or id ending match
           const q = query(collection(db, "articles"), where("slug", "==", slugOrId));
-          const querySnap = await Promise.race([
-            getDocs(q),
-            new Promise<null>((r) => setTimeout(() => r(null), 400))
-          ]);
-          if (querySnap && !(querySnap as any).empty) {
-            const firstDoc = (querySnap as any).docs[0];
-            if (firstDoc) art = { id: firstDoc.id, ...firstDoc.data() } as Article;
+          const querySnap = await getDocs(q);
+          if (querySnap && !querySnap.empty) {
+            const firstDoc = querySnap.docs[0];
+            if (firstDoc) art = { id: firstDoc.id, ...(firstDoc.data() as Article) };
           }
         } catch (e) {
-          // Ignore timeout
+          // Ignore error
         }
       }
-    }
-
-    // 3. Synthetic fallback for 2-segment article routes if no matching article in DB
-    if (!art && (segments.length >= 2 || category === "article")) {
-      const cleanTitleText = slugOrId
-        .replace(/-/g, " ")
-        .replace(/([0-9]{10,}|news-[0-9]+|art-[a-z0-9\-]+)$/i, "")
-        .trim();
-
-      const formattedTitle = cleanTitleText
-        ? cleanTitleText.charAt(0).toUpperCase() + cleanTitleText.slice(1)
-        : "ताज़ा हिंदी समाचार";
-
-      art = {
-        id: cleanId || slugOrId || "art-" + Date.now(),
-        title: formattedTitle,
-        subtitle: "सारादेश पर पढ़ें भारत, राज्य, दुनिया, राजनीति, खेल, व्यापार, मनोरंजन, टेक्नोलॉजी और अन्य श्रेणियों की ताज़ा और विश्वसनीय हिंदी खबरें।",
-        content: "सारादेश डिजिटल हिंदी समाचार पोर्टल पर देश और दुनिया की ताज़ा, सटीक और निष्पक्ष खबरें सबसे पहले पढ़ें।",
-        category: category || "national",
-        author: "सारादेश सम्पादकीय टीम",
-        date: "अभी-अभी",
-        readTime: 3,
-        views: 120,
-        likes: 15,
-        comments: [],
-        isBreaking: false,
-        isFeatured: false,
-        isTrending: false,
-        createdAt: new Date().toISOString(),
-        image: `https://${domain}/saradesh-logo.png`,
-        tags: ["मुख्य समाचार", "सारादेश"]
-      };
     }
 
     if (!art || !art.title) {
@@ -3494,10 +3457,25 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
     const fullCanonicalUrl = `https://${domain}${canonicalPath}`;
 
     const title = `${art.title} - सारादेश`;
-    const description = art.subtitle || (art.content ? art.content.substring(0, 160).replace(/\n/g, " ") : "सारादेश पर पढ़ें ताज़ा और विश्वसनीय हिंदी खबरें।");
+    
+    // Extract description directly from article object properties (metaDescription, subtitle, summary, content)
+    const rawDesc = (art as any).metaDescription || art.subtitle || (art as any).summary || art.content || "सारादेश पर पढ़ें ताज़ा और विश्वसनीय हिंदी खबरें।";
+    const description = rawDesc.substring(0, 160).replace(/\n/g, " ").trim();
+
     const image = art.image || `https://${domain}/saradesh-logo.png`;
     const officialLogo = `https://${domain}/saradesh-logo.png`;
-    const pubDate = art.createdAt ? new Date(art.createdAt).toISOString() : new Date().toISOString();
+    
+    // Extract published & modified date directly from article object properties
+    const rawPubDate = (art as any).publishDate || art.createdAt || (art as any).date;
+    const pubDate = rawPubDate ? new Date(rawPubDate).toISOString() : new Date().toISOString();
+    const rawModDate = (art as any).updatedDate || (art as any).updatedAt || rawPubDate;
+    const modDate = rawModDate ? new Date(rawModDate).toISOString() : pubDate;
+
+    // Extract author, category, keywords directly from article object properties
+    const authorName = art.author || (art as any).authorName || "सारादेश सम्पादकीय टीम";
+    const articleCategory = art.category || "national";
+    const rawKeywords = (art as any).keywords || (art.tags && art.tags.length > 0 ? art.tags.join(", ") : "सारादेश, हिंदी समाचार, न्यूज़");
+    const keywordsStr = Array.isArray(rawKeywords) ? rawKeywords.join(", ") : rawKeywords;
 
     const jsonLd = {
       "@context": "https://schema.org",
@@ -3511,11 +3489,11 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
       "description": description,
       "image": [image],
       "datePublished": pubDate,
-      "dateModified": pubDate,
+      "dateModified": modDate,
       "author": {
         "@type": "Person",
-        "name": art.author || "सारादेश सम्पादकीय टीम",
-        "url": `https://${domain}/?author=${encodeURIComponent(art.author || "सारादेश सम्पादकीय टीम")}`
+        "name": authorName,
+        "url": `https://${domain}/?author=${encodeURIComponent(authorName)}`
       },
       "publisher": {
         "@type": "NewsMediaOrganization",
@@ -3528,10 +3506,10 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
           "height": 120
         }
       },
-      "articleSection": art.category || "national",
+      "articleSection": articleCategory,
       "articleBody": art.content || "",
       "inLanguage": "hi",
-      "keywords": (art.tags && art.tags.length > 0) ? art.tags.join(", ") : "सारादेश, हिंदी समाचार, न्यूज़"
+      "keywords": keywordsStr
     };
 
     const breadcrumbLd = {
@@ -3547,8 +3525,8 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
         {
           "@type": "ListItem",
           "position": 2,
-          "name": art.category || "national",
-          "item": `https://${domain}/${art.category || "national"}`
+          "name": articleCategory,
+          "item": `https://${domain}/${articleCategory}`
         },
         {
           "@type": "ListItem",
