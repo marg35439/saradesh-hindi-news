@@ -13,10 +13,12 @@ export default defineConfig(() => {
       devSourcemap: false,
     },
     build: {
-      target: ['es2017', 'chrome79', 'firefox78', 'safari13', 'edge79'],
-      cssTarget: ['chrome79', 'firefox78', 'safari13', 'edge79'],
+      target: ['es2020', 'chrome80', 'firefox78', 'safari14', 'edge80'],
+      cssTarget: ['chrome80', 'firefox78', 'safari14', 'edge80'],
       minify: 'esbuild',
       cssMinify: true,
+      cssCodeSplit: true,
+      assetsInlineLimit: 4096,
       modulePreload: {
         polyfill: false,
       },
@@ -24,7 +26,7 @@ export default defineConfig(() => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
                 return 'vendor-react';
               }
               if (id.includes('lucide-react')) {
@@ -43,7 +45,8 @@ export default defineConfig(() => {
       },
     },
     esbuild: {
-      target: 'es2017',
+      target: 'es2020',
+      drop: ['console', 'debugger'],
     },
     resolve: {
       alias: {

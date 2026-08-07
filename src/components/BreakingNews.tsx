@@ -11,7 +11,19 @@ export default function BreakingNews({ articles, onArticleClick }: BreakingNewsP
   // Take only the top 10 latest articles for the ticker
   const tickerList = articles.length > 0 ? articles.slice(0, 10) : [];
 
-  if (tickerList.length === 0) return null;
+  if (tickerList.length === 0) {
+    return (
+      <div className="bg-neutral-900 text-white border-y border-amber-500/30 overflow-hidden relative z-40 h-11 min-h-[44px]">
+        <div className="max-w-7xl mx-auto flex items-center h-11 text-xs px-4">
+          <div className="bg-red-600 h-full px-3.5 flex items-center justify-center font-black text-white gap-2 shrink-0 text-[11px] uppercase">
+            <AlertCircle className="w-4 h-4 text-yellow-300 animate-bounce" />
+            <span>लाइव टिकर</span>
+          </div>
+          <div className="ml-4 h-3.5 w-64 bg-neutral-800 animate-pulse rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   // Duplicate the list of articles to ensure a smooth, seamless looping marquee
   const items = [...tickerList, ...tickerList, ...tickerList];
