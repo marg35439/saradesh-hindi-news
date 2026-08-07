@@ -12,6 +12,7 @@ import { initGA, logPageView } from "./lib/analytics";
 import { Article, CategoryKey, CATEGORIES, STATES, SUBCATEGORIES } from "./types";
 import { fetchNewsList } from "./lib/newsClient";
 import { getArticleUrl, parseArticleUrlPath } from "./lib/slug";
+import { FALLBACK_NEWS } from "./data/fallbackNews";
 
 // Code-split non-critical views with React.lazy
 const AdminPanel = lazy(() => import("./components/AdminPanel"));
@@ -23,8 +24,8 @@ const PolicyPages = lazy(() => import("./components/PolicyPages").then(m => ({ d
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articles, setArticles] = useState<Article[]>(FALLBACK_NEWS);
+  const [loading, setLoading] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [selectedPolicyPage, setSelectedPolicyPage] = useState<"editorial-policy" | "corrections-policy" | "fact-check-policy" | "publisher-info" | "about-us" | "contact-us" | "privacy-policy" | "terms-and-conditions" | "disclaimer" | "editorial-team" | null>(null);
@@ -294,10 +295,11 @@ export default function App() {
   }, [selectedCategory, selectedSubcategory, selectedState, searchQuery, isAdminMode]);
 
   const loadNews = () => {
-    setLoading(true);
     fetchNewsList(selectedCategory, selectedState, searchQuery, selectedSubcategory || undefined)
       .then((data: Article[]) => {
-        setArticles(data);
+        if (data && data.length > 0) {
+          setArticles(data);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -724,16 +726,12 @@ export default function App() {
                   <>
                     {/* Top Hero News (Featured Core Article) - Rendered only when not searching and on main Home page */}
                     {featuredArticle && !searchQuery && selectedCategory === "all" && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white border border-neutral-200/90 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group p-3.5 md:p-4.5 relative"
-                      >
+                      <div className="bg-white border border-neutral-200/90 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group p-3.5 md:p-4.5 relative">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                           {/* Image column */}
                           <div className="md:col-span-7 relative aspect-video md:aspect-auto overflow-hidden bg-neutral-900 min-h-[220px] md:min-h-[280px] rounded-xl shadow-xs">
                             <img
-                              src={featuredArticle.image}
+                              src={featuredArticle.image.includes("images.unsplash.com") ? `${featuredArticle.image.split("?")[0]}?auto=format&fit=crop&w=800&q=75` : featuredArticle.image}
                               alt={featuredArticle.title}
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
@@ -760,12 +758,12 @@ export default function App() {
                                 <span>{featuredArticle.date}</span>
                               </div>
 
-                              <h2 
+                              <h1 
                                 onClick={() => handleArticleClick(featuredArticle)}
                                 className="text-xl md:text-3xl font-black text-red-700 hover:text-red-900 tracking-tight leading-snug transition-colors cursor-pointer mb-2.5 line-clamp-3"
                               >
                                 {featuredArticle.title}
-                              </h2>
+                              </h1>
 
                               <p className="text-base sm:text-lg md:text-xl font-normal text-neutral-800 leading-relaxed font-sans line-clamp-3 md:line-clamp-4 mb-4">
                                 {featuredArticle.subtitle}
@@ -783,7 +781,7 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     )}
 
                     {/* Section title */}

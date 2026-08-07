@@ -94,7 +94,7 @@ export default function ArticleCard({
           {/* Small Screenshot Thumbnail */}
           <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-100 shrink-0 border border-neutral-200/80 relative">
             <img
-              src={article.image}
+              src={article.image.includes("images.unsplash.com") ? `${article.image.split("?")[0]}?auto=format&fit=crop&w=120&q=75` : article.image}
               alt={article.title}
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -158,7 +158,7 @@ export default function ArticleCard({
       {/* Article Cover Image (Left side) */}
       <div className="relative w-28 h-28 sm:w-36 sm:h-28 md:w-40 md:h-28 rounded-xl overflow-hidden bg-neutral-100 shrink-0 self-center shadow-2xs">
         <img
-          src={article.image}
+          src={article.image.includes("images.unsplash.com") ? `${article.image.split("?")[0]}?auto=format&fit=crop&w=360&q=75` : article.image}
           alt={article.title}
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
