@@ -330,6 +330,8 @@ export default function ArticleDetail({
                 referrerPolicy="no-referrer"
                 loading="lazy"
                 decoding="async"
+                width="768"
+                height="432"
               />
             </div>
             {block.imgCaption && (
@@ -532,6 +534,8 @@ export default function ArticleDetail({
           fetchPriority="high"
           loading="eager"
           decoding="async"
+          width="800"
+          height="450"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
       </div>

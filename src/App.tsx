@@ -740,6 +740,8 @@ export default function App() {
                               fetchPriority="high"
                               loading="eager"
                               decoding="async"
+                              width="800"
+                              height="450"
                             />
                             <div className="absolute top-3 left-3 bg-gradient-to-r from-red-600 to-rose-600 text-white text-[10px] font-black uppercase px-3 py-1 rounded-lg shadow-lg z-10 font-sans tracking-wide flex items-center gap-1.5">
                               <span className="w-2 h-2 bg-white rounded-full animate-ping"></span>

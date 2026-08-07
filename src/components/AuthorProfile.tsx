@@ -57,6 +57,10 @@ export const AuthorProfile: React.FC<AuthorProfileProps> = ({
               src={authorProfile.avatar}
               alt={authorName}
               className="w-28 h-28 md:w-32 md:h-32 rounded-full object-cover border-4 border-amber-500 shadow-md"
+              loading="lazy"
+              decoding="async"
+              width="128"
+              height="128"
             />
           ) : (
             <div className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-amber-100 text-amber-800 font-black text-3xl md:text-4xl flex items-center justify-center border-4 border-amber-500 shadow-md">
