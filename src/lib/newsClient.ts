@@ -45,20 +45,22 @@ export async function fetchNewsList(
     console.warn("Firestore list fetch warning (using local fallback if needed):", err);
   }
 
-  // Combine Firestore articles with FALLBACK_NEWS
+  // Use Firestore articles exclusively if present; fallback news only if 0 articles
   const articleMap = new Map<string, Article>();
 
-  // Initialize with fallback news
-  for (const item of FALLBACK_NEWS) {
-    if (!deletedIds.includes(item.id)) {
-      articleMap.set(item.id, item);
-    }
-  }
+  const BANNED_IDS = ["fresh-news-neet-ug-2026", "fresh-news-ipl-2026-gt-csk", "news-delhi-earthquake-2026"];
 
-  // Override or insert Firestore articles
-  for (const item of firestoreArticles) {
-    if (!deletedIds.includes(item.id)) {
-      articleMap.set(item.id, item);
+  if (firestoreArticles.length > 0) {
+    for (const item of firestoreArticles) {
+      if (!deletedIds.includes(item.id) && !BANNED_IDS.includes(item.id)) {
+        articleMap.set(item.id, item);
+      }
+    }
+  } else {
+    for (const item of FALLBACK_NEWS) {
+      if (!deletedIds.includes(item.id) && !BANNED_IDS.includes(item.id)) {
+        articleMap.set(item.id, item);
+      }
     }
   }
 

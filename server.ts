@@ -1686,13 +1686,11 @@ app.post("/api/gemini/generate", async (req, res) => {
       }
     ];
 
-    // Find custom match based on category, else select at random
     let fallbackSelected = fallbackDB.find(art => art.category === category);
     if (!fallbackSelected) {
       fallbackSelected = fallbackDB[Math.floor(Math.random() * fallbackDB.length)];
     }
 
-    // Adapt fallback with user's specific prompt so it matches exactly what they were trying to write!
     const customTitle = `${prompt.length > 50 ? prompt.substring(0, 50) + "..." : prompt} - सारादेश मुख्य रिपोर्ट`;
     const adaptedContent = `[सम्पादकीय एआई-रेट-लिमिट बैकअप सक्रिय] \n\n${prompt} विषय पर सारादेश.in की विशेष पत्रकार टीम द्वारा संकलित सामग्री निम्नलिखित है: \n\n${fallbackSelected.content}`;
 
@@ -1706,133 +1704,6 @@ app.post("/api/gemini/generate", async (req, res) => {
       image: fallbackSelected.image,
       author: "सारादेश.in एआई संपादक मंडल (बैकअप)"
     });
-  }
-});
-
-// POST /api/gemini/scrape-hot-news
-app.post("/api/gemini/scrape-hot-news", async (req, res) => {
-  try {
-    const ai = getGeminiClient();
-
-    // STEP 1: Perform real-time news retrieval from Hindi news portals using Google Search grounding
-    const searchPrompt = `Search and gather 6 to 8 currently active, real top breaking news stories of today (actual live events happening in India) from three leading Hindi news portals:
-1. आजतक (aajtak.in)
-2. नवभारत टाइम्स (navbharattimes.indiatimes.com)
-3. दैनिक भास्कर (bhaskar.com)
-
-Use the search tool to run queries like:
-- "site:aajtak.in latest breaking news today"
-- "site:bhaskar.com breaking news cricket state national"
-- "site:navbharattimes.indiatimes.com latest news"
-
-For each real story, compile:
-- Title (a catchy, concise Hindi headline)
-- Summary (2-3 high-quality Hindi sentences detailing the event)
-- Category ("national" | "state" | "sports" | "entertainment" | "business" | "tech" | "lifestyle" | "international" | "job" | "education" | "religion" | "astrology")
-- Source ("आजतक" | "नवभारत टाइम्स" | "दैनिक भास्कर")
-- A short English search term representing the occurrence.`;
-
-    const searchResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: searchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }] // Simpler call with search grounding
-      }
-    });
-
-    const searchOutputText = searchResponse.text;
-    if (!searchOutputText) {
-      throw new Error("No live news returned from Search Grounding");
-    }
-
-    // STEP 2: Use a clean instruction with responseSchema to format the retrieved text into the strict JSON schema
-    const formatSystemPrompt = `You are an elite data formatter. Convert the provided Hindi news text into a valid JSON array matching the specified schema exactly. Do not output any preamble, extra text, or markdown code blocks. Output raw JSON only.
-
-Schema:
-interface ScrapedNewsItem {
-  tempId: string; // unique short ID e.g. "scraped-1", "scraped-2"
-  title: string; // catchy, concise Hindi headline of the event
-  summary: string; // a high-quality 2-3 sentence description in Hindi
-  category: "national" | "state" | "sports" | "entertainment" | "business" | "tech" | "lifestyle" | "international" | "job" | "education" | "religion" | "astrology"; 
-  source: "आजतक" | "नवभारत टाइम्स" | "दैनिक भास्कर" | string;
-  searchQuery: string; // English/Hindi search query representing the event
-}`;
-
-    const formatResponse = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: `Parse these real-time news articles text and output them as a JSON array according to the schema:
-      
-      ${searchOutputText}`,
-      config: {
-        systemInstruction: formatSystemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            required: ["tempId", "title", "summary", "category", "source", "searchQuery"],
-            properties: {
-              tempId: { type: Type.STRING },
-              title: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              category: { type: Type.STRING },
-              source: { type: Type.STRING },
-              searchQuery: { type: Type.STRING }
-            }
-          }
-        }
-      }
-    });
-
-    let jsonText = formatResponse.text.trim();
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-    }
-
-    const parsedArray = JSON.parse(jsonText);
-    if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-      res.json(parsedArray);
-    } else {
-      throw new Error("Parsed JSON array is empty or invalid format");
-    }
-  } catch (err: any) {
-    console.warn("Crawler quota exhausted or failed, returning premium seed trending items:", err.message);
-    const todayStr = new Date().toLocaleDateString('hi-IN', { year: 'numeric', month: 'long', day: 'numeric' });
-    const crawlerFallback = [
-      {
-        tempId: "f-1",
-        title: "मौसम विभाग की ताज़ा चेतावनी: देश के प्रमुख राज्यों में मौसम के अचानक बदलाव का अलर्ट जारी",
-        summary: "मौसम विज्ञान विभाग (IMD) ने राष्ट्रीय राजधानी क्षेत्र और कई उत्तरी राज्यों में आगामी 24 घंटों के लिए मौसम संबंधी ताज़ा चेतावनी जारी की है। इस बदलाव से तापमान में बदलाव और हल्की बूंदाबांदी का अनुमान है।",
-        category: "national",
-        source: "IMD मौसम रिपोर्ट (" + todayStr + ")",
-        searchQuery: "India IMD weather report orange alert storm rain status"
-      },
-      {
-        tempId: "f-2",
-        title: "भारतीय शेयर बाजार का ताज़ा हाल: बैंकिंग व टेक शेयरों में मजबूत लिवाली से बाजार में रौनक",
-        summary: "ग्लोबल मार्केट से मिले संकेतों के बीच भारतीय शेयर बाजार में निवेशकों का भरोसा बना हुआ है। आईटी और बैंकिंग सेक्टर के प्रमुख शेयरों में लिवाली से सेंसेक्स व निफ्टी मजबूत स्थिति में कारोबार कर रहे हैं।",
-        category: "business",
-        source: "एनएसई/बीएसई ट्रेडिंग अपडेट",
-        searchQuery: "Indian stock market Sensex Nifty banking IT rally analysis"
-      },
-      {
-        tempId: "f-3",
-        title: "भारतीय खेल क्षेत्र से ताज़ा अपडेट: युवा खिलाड़ियों का शानदार प्रदर्शन और आगामी टूर्नामेंट की तैयारी",
-        summary: "भारतीय खेल प्राधिकरण और खेल संघों ने आगामी प्रमुख अंतरराष्ट्रीय प्रतियोगिताओं के लिए युवा एथलीटों का चयन प्रक्रिया पूरी कर ली है। कोचों ने टीम के प्रदर्शन पर संतोष व्यक्त किया है।",
-        category: "sports",
-        source: "खेल मीडिया डेस्क",
-        searchQuery: "Team India sports tournament performance updates"
-      },
-      {
-        tempId: "f-4",
-        title: "अंतरिक्ष व तकनीक में भारत का नया कदम: स्वदेशी स्पेस मिशन व आधुनिक लैब का सफल परीक्षण",
-        summary: "भारतीय वैज्ञानिकों और शोधकर्ताओं ने स्वदेशी तकनीक का उपयोग कर नया मुकाम हासिल किया है। इस कदम से भविष्य के तकनीकी शोधों को गति मिलेगी और वैश्विक स्तर पर पहचान मजबूत होगी।",
-        category: "tech",
-        source: "विज्ञान बुलेटिन",
-        searchQuery: "ISRO space technology autonomous test success"
-      }
-    ];
-    res.json(crawlerFallback);
   }
 });
 
@@ -3069,6 +2940,7 @@ app.post("/api/gemini/autopilot", async (req, res) => {
 
     // Save article directly to Firebase Firestore database so it is saved instantly
     await setDoc(doc(db, "articles", articleId), newArticle);
+    invalidateServerArticlesCache();
 
     res.json({
       success: true,
@@ -3082,62 +2954,19 @@ app.post("/api/gemini/autopilot", async (req, res) => {
 });
 
 
-async function ensureRequestedArticlesExist() {
-  console.log("Ensuring the two requested user news articles (NEET-UG 2026 & IPL 2026) exist in Firestore as fresh posts...");
-  const articlesToSave = [
-    {
-      id: "fresh-news-neet-ug-2026",
-      title: "NEET-UG 2026 विवाद: पेपर लीक या केवल प्रश्न लीक? छात्रों में बढ़ी चिंता",
-      subtitle: "राष्ट्रीय परीक्षा एजेंसी (NTA) प्रमुख का बड़ा बयान: पूरे प्रश्नपत्र लीक के प्रमाण नहीं, संसदीय समिति के सामने रखी रिपोर्ट।",
-      content: "देश की सबसे बड़ी मेडिकल प्रवेश परीक्षा NEET-UG 2026 एक बार फिर विवादों के केंद्र में है। परीक्षा के बाद सोशल मीडिया पर पेपर लीक के आरोप सामने आने लगे, जिसके बाद लाखों छात्रों और अभिभावकों में चिंता का माहौल बन गया। अब इस मामले में राष्ट्रीय परीक्षा एजेंसी (NTA) की ओर से बड़ा बयान सामने आया है।\n\nNTA प्रमुख ने संसदीय समिति के सामने कहा कि पूरे प्रश्नपत्र के लीक होने के प्रमाण नहीं मिले हैं। एजेंसी के अनुसार कुछ प्रश्न परीक्षा से पहले बाहर आने की बात सामने आई है, लेकिन पूरा पेपर लीक नहीं हुआ था। हालांकि इस बयान के बाद भी छात्रों और शिक्षा विशेषज्ञों के बीच सवाल बने हुए हैं।\n\nवहीं दूसरी ओर, कई छात्र संगठनों और मेडिकल संगठनों ने परीक्षा प्रणाली में सुधार की मांग उठाई है। परीक्षा प्रक्रिया की सुरक्षा, डिजिटल निगरानी और पारदर्शिता को लेकर भी चर्चाएं तेज़ हो गई हैं। कुछ रिपोर्टों में यह भी कहा गया कि कथित तौर पर कई प्रश्न वास्तविक परीक्षा से मेल खाते पाए गए, जिससे संदेह और बढ़ गया।\n\nफिलहाल लाखों अभ्यर्थियों की नजर आने वाले दिनों में सरकार, NTA और न्यायिक प्रक्रिया से जुड़े संभावित फैसलों पर बनी हुई है।",
-      category: "national",
-      image: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?q=80&w=800&auto=format&fit=crop",
-      author: "आलोक श्रीवास्तव",
-      date: new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      readTime: 4,
-      views: 1250,
-      likes: 184,
-      comments: [],
-      tags: ["NEET-UG 2026", "NTA", "पेपर लीक", "शिक्षा", "छात्र आंदोलन"],
-      isBreaking: true,
-      isFeatured: true,
-      isTrending: true,
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: "fresh-news-ipl-2026-gt-csk",
-      title: "IPL 2026: गुजरात टाइटंस की धमाकेदार जीत, चेन्नई को 89 रन से हराकर प्लेऑफ समीकरण बदले",
-      subtitle: "शुभमन गिल की कप्तानी पारी और राशिद खान की घातक गेंदबाजी के आगे बेबस दिखी चेन्नई सुपर किंग्स; प्लेऑफ की जंग रोमांचक मोड़ पर।",
-      content: "IPL 2026 में गुजरात टाइटंस ने चेन्नई सुपर किंग्स के खिलाफ शानदार प्रदर्शन करते हुए बड़ी जीत दर्ज की। अहम मुकाबले में गुजरात ने पहले बल्लेबाजी करते हुए मजबूत स्कोर खड़ा किया और बाद में अपनी गेंदबाजी से चेन्नई की टीम को पूरी तरह दबाव में ला दिया।\n\nमैच में गुजरात के बल्लेबाजों ने शुरुआत से ही आक्रामक खेल दिखाया। टीम की ओर से शानदार साझेदारी देखने को मिली, जबकि गेंदबाजों ने भी महत्वपूर्ण समय पर विकेट लेकर मैच का रुख पूरी तरह बदल दिया। जवाब में चेन्नई सुपर किंग्स की बल्लेबाजी संघर्ष करती नजर आई और टीम लक्ष्य का पीछा करते हुए बड़ा अंतर नहीं पाट सकी। रिपोर्टों के अनुसार गुजरात ने 89 रन से मुकाबला अपने नाम किया।\n\nइस जीत के साथ गुजरात की टीम को अंक तालिका में बड़ा फायदा मिला, जबकि चेन्नई की प्लेऑफ उम्मीदों को बड़ा झटका लगा है। अब आगे आने वाले मैचों में अन्य टीमों के लिए भी प्लेऑफ की दौड़ और अधिक रोमांचक होती दिखाई दे रही है।",
-      category: "sports",
-      image: "https://images.unsplash.com/photo-1540747737956-378724043924?q=80&w=800&auto=format&fit=crop",
-      author: "राजेश वर्मा",
-      date: new Date().toLocaleDateString('hi-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      readTime: 3,
-      views: 980,
-      likes: 112,
-      comments: [],
-      tags: ["IPL 2026", "गुजरात टाइटंस", "चेन्नई सुपर किंग्स", "शुभमन गिल", "क्रिकेट"],
-      isBreaking: false,
-      isFeatured: false,
-      isTrending: true,
-      createdAt: new Date().toISOString()
-    }
-  ];
-
+async function purgeOldMockArticles() {
+  const idsToPurge = ["fresh-news-neet-ug-2026", "fresh-news-ipl-2026-gt-csk", "news-delhi-earthquake-2026"];
   try {
-    for (const art of articlesToSave) {
-      const slug = generateSeoSlug(art.title);
-      const mainCat = getMainCategorySlug(art.category);
-      await setDoc(doc(db, "articles", art.id), {
-        ...art,
-        slug,
-        mainCategory: mainCat
-      });
+    await setDoc(doc(db, "deleted_articles", "index"), {
+      ids: arrayUnion(...idsToPurge)
+    }, { merge: true });
+    for (const id of idsToPurge) {
+      await deleteDoc(doc(db, "articles", id)).catch(() => {});
     }
-    console.log("Successfully seeded/updated the two user requested articles in Firestore!");
+    invalidateServerArticlesCache();
+    console.log("Purged old mock articles (NEET, IPL, Earthquake) from Firestore!");
   } catch (err: any) {
-    console.error("Failed to seed user requested articles on startup:", err);
+    console.warn("Purge old mock articles warning:", err);
   }
 }
 
@@ -3153,15 +2982,53 @@ function escapeXml(str: any): string {
     .replace(/'/g, "&apos;");
 }
 
-async function fetchArticlesFromFirestoreWithTimeout(timeoutMs = 2500): Promise<any[]> {
+let serverArticlesCache: any[] | null = null;
+let serverArticlesCacheTimestamp = 0;
+
+export function invalidateServerArticlesCache() {
+  serverArticlesCache = null;
+  serverArticlesCacheTimestamp = 0;
+}
+
+async function fetchArticlesFromFirestoreWithTimeout(timeoutMs = 4000): Promise<any[]> {
+  const now = Date.now();
+  if (serverArticlesCache && (now - serverArticlesCacheTimestamp < 30000)) {
+    return serverArticlesCache;
+  }
+
   try {
     const fetchPromise = (async () => {
+      let deletedIds: string[] = [];
+      try {
+        const deletedSnap = await getDoc(doc(db, "deleted_articles", "index"));
+        if (deletedSnap.exists()) {
+          deletedIds = deletedSnap.data()?.ids || [];
+        }
+      } catch {}
+
       const querySnapshot = await getDocs(collection(db, "articles"));
-      const list: any[] = [];
+      const map = new Map<string, any>();
+
+      for (const item of DEFAULT_NEWS) {
+        if (!deletedIds.includes(item.id)) {
+          map.set(item.id, item);
+        }
+      }
+
       querySnapshot.forEach((docSnap) => {
         const d = docSnap.data();
-        if (d) list.push(d);
+        if (d && d.id && !deletedIds.includes(d.id)) {
+          map.set(d.id, d);
+        }
       });
+
+      const list = Array.from(map.values());
+      list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+
       return list;
     })();
 
@@ -3171,13 +3038,18 @@ async function fetchArticlesFromFirestoreWithTimeout(timeoutMs = 2500): Promise<
 
     const result = await Promise.race([fetchPromise, timeoutPromise]);
     if (Array.isArray(result) && result.length > 0) {
+      serverArticlesCache = result;
+      serverArticlesCacheTimestamp = now;
       return result;
     }
-    return DEFAULT_NEWS;
   } catch (err) {
-    console.warn("Firestore XML fetch fallback to DEFAULT_NEWS:", err);
-    return DEFAULT_NEWS;
+    console.warn("Firestore XML fetch warning:", err);
   }
+
+  if (serverArticlesCache && serverArticlesCache.length > 0) {
+    return serverArticlesCache;
+  }
+  return DEFAULT_NEWS;
 }
 
 app.get("/robots.txt", (req, res) => {
@@ -3721,9 +3593,9 @@ async function startServer() {
   if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Dainik Bhaskar custom server listening on port ${PORT}`);
-      // Ensure requested articles exist in the background (non-blocking)
-      ensureRequestedArticlesExist().catch((e) => {
-        console.warn("Non-blocking error checking startup articles:", e);
+      // Purge old mock articles on startup
+      purgeOldMockArticles().catch((e) => {
+        console.warn("Non-blocking error purging startup articles:", e);
       });
     });
   }

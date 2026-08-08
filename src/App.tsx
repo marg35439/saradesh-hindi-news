@@ -25,10 +25,23 @@ const PolicyPages = lazy(() => import("./components/PolicyPages").then(m => ({ d
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [articles, setArticles] = useState<Article[]>(() => {
-    if (typeof window !== "undefined" && (window as any).__INITIAL_NEWS__ && Array.isArray((window as any).__INITIAL_NEWS__) && (window as any).__INITIAL_NEWS__.length > 0) {
-      return (window as any).__INITIAL_NEWS__;
+    const BANNED_IDS = ["fresh-news-neet-ug-2026", "fresh-news-ipl-2026-gt-csk", "news-delhi-earthquake-2026"];
+    if (typeof window !== "undefined") {
+      if ((window as any).__INITIAL_NEWS__ && Array.isArray((window as any).__INITIAL_NEWS__) && (window as any).__INITIAL_NEWS__.length > 0) {
+        return (window as any).__INITIAL_NEWS__.filter((a: any) => !BANNED_IDS.includes(a.id));
+      }
+      try {
+        const cached = localStorage.getItem("saradesh_cached_articles");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const filtered = parsed.filter((a: any) => !BANNED_IDS.includes(a.id));
+            if (filtered.length > 0) return filtered;
+          }
+        }
+      } catch {}
     }
-    return FALLBACK_NEWS;
+    return FALLBACK_NEWS.filter(a => !BANNED_IDS.includes(a.id));
   });
   const [loading, setLoading] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
@@ -299,6 +312,11 @@ export default function App() {
       .then((data: Article[]) => {
         if (data && data.length > 0) {
           setArticles(data);
+          if (selectedCategory === "all" && (!selectedState || selectedState === "सभी राज्य") && !searchQuery && !selectedSubcategory) {
+            try {
+              localStorage.setItem("saradesh_cached_articles", JSON.stringify(data));
+            } catch {}
+          }
         }
         setLoading(false);
       })
