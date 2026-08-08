@@ -25,17 +25,17 @@ export const FALLBACK_NEWS: Article[] = [
     state: "दिल्ली",
     image: "https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800&q=80",
     author: "राष्ट्रीय ब्यूरो",
-    date: "2 अगस्त 2026",
+    date: "8 अगस्त 2026",
     readTime: 3,
     views: 4500,
     likes: 920,
     comments: [],
-    tags: ["दिल्ली भूकंप", "Delhi Earthquake", "भूकंप 2 अगस्त 2026", "नेशनल सेंटर फॉर सीस्मोलॉजी", "सिस्मिक जोन 4", "राष्ट्रीय राजधानी न्यूज़"],
+    tags: ["दिल्ली भूकंप", "Delhi Earthquake", "भूकंप 8 अगस्त 2026", "नेशनल सेंटर फॉर सीस्मोलॉजी", "सिस्मिक जोन 4", "राष्ट्रीय राजधानी न्यूज़"],
     metaDescription: "दिल्ली में तड़के 2.9 तीव्रता का भूकंप, उत्तरी जिले में केंद्र, जान-माल के नुकसान की कोई खबर नहीं, जानें पूरी डिटेल।",
     isBreaking: true,
     isFeatured: true,
     isTrending: true,
-    createdAt: "2026-08-02T04:14:00.000Z"
+    createdAt: "2026-08-08T06:00:00.000Z"
   },
   {
     id: "news-delhi-drone-ban-independence-day",

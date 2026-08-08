@@ -24,7 +24,12 @@ const PolicyPages = lazy(() => import("./components/PolicyPages").then(m => ({ d
 
 export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [articles, setArticles] = useState<Article[]>(FALLBACK_NEWS);
+  const [articles, setArticles] = useState<Article[]>(() => {
+    if (typeof window !== "undefined" && (window as any).__INITIAL_NEWS__ && Array.isArray((window as any).__INITIAL_NEWS__) && (window as any).__INITIAL_NEWS__.length > 0) {
+      return (window as any).__INITIAL_NEWS__;
+    }
+    return FALLBACK_NEWS;
+  });
   const [loading, setLoading] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
@@ -125,16 +130,13 @@ export default function App() {
 
   useEffect(() => {
     const getSidebarWeather = () => {
-      fetch(`/api/weather?_t=${Date.now()}`, {
-        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
-      })
+      fetch("/api/weather")
         .then((res) => {
           if (res.ok) return res.json();
           throw new Error();
         })
         .then((data) => setSidebarWeather(data))
         .catch(() => {
-          // Fallback of cities
           setSidebarWeather({
             "दिल्ली": { temp: 32, text: "साफ मौसम", icon: "Sun" },
             "मुंबई": { temp: 30, text: "उमस भरा मौसम", icon: "Cloud" },
@@ -148,9 +150,7 @@ export default function App() {
     };
 
     const getMarketData = () => {
-      fetch(`/api/market?_t=${Date.now()}`, {
-        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
-      })
+      fetch("/api/market")
         .then((res) => {
           if (res.ok) return res.json();
           throw new Error();
@@ -162,9 +162,9 @@ export default function App() {
     getSidebarWeather();
     getMarketData();
 
-    // Poll every 15 seconds for live real-time market and weather updates
-    const weatherInterval = setInterval(getSidebarWeather, 20000);
-    const marketInterval = setInterval(getMarketData, 15000);
+    // Poll every 3 minutes for live real-time market and weather updates
+    const weatherInterval = setInterval(getSidebarWeather, 180000);
+    const marketInterval = setInterval(getMarketData, 180000);
 
     // Refresh data when browser tab becomes active
     const handleVisibilityChange = () => {

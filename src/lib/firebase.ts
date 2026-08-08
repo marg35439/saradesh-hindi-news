@@ -14,7 +14,21 @@ import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+let _authInstance: ReturnType<typeof getAuth> | null = null;
+export function getFirebaseAuth() {
+  if (!_authInstance) {
+    _authInstance = getAuth(app);
+  }
+  return _authInstance;
+}
+
+export const auth = new Proxy({} as ReturnType<typeof getAuth>, {
+  get(_target, prop) {
+    const instance = getFirebaseAuth();
+    const val = (instance as any)[prop];
+    return typeof val === "function" ? val.bind(instance) : val;
+  }
+});
 
 export interface UserRoleData {
   uid: string;

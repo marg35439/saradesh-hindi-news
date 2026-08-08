@@ -2835,6 +2835,33 @@ app.delete("/api/news/:id", async (req, res) => {
   }
 });
 
+// GET /api/weather endpoint
+app.get("/api/weather", (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+  res.json({
+    "दिल्ली": { temp: 32, text: "साफ व धूप वाला मौसम", icon: "Sun" },
+    "मुंबई": { temp: 30, text: "उमस भरा मौसम", icon: "Cloud" },
+    "जयपुर": { temp: 33, text: "तेज धूप", icon: "Sun" },
+    "भोपाल": { temp: 29, text: "आंशिक रूप से बादल", icon: "CloudSun" },
+    "लखनऊ": { temp: 31, text: "हल्की धूप", icon: "Sun" },
+    "पटना": { temp: 31, text: "सामान्य मौसम", icon: "CloudSun" },
+    "रांची": { temp: 27, text: "मौसम सुहावना", icon: "Cloud" }
+  });
+});
+
+// GET /api/market endpoint
+app.get("/api/market", (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+  res.json({
+    sensex: { price: 81450, change: 320, changePct: 0.39, isUp: true },
+    nifty: { price: 24820, change: 95, changePct: 0.38, isUp: true },
+    banknifty: { price: 52100, change: -120, changePct: -0.23, isUp: false },
+    gold: { price: 74200, change: 150, changePct: 0.20, isUp: true },
+    silver: { price: 88500, change: -300, changePct: -0.34, isUp: false },
+    lastUpdated: new Date().toLocaleTimeString('hi-IN')
+  });
+});
+
 // POST Gemini generate news endpoint
 app.post("/api/gemini/generate", async (req, res) => {
   try {
@@ -3622,6 +3649,24 @@ app.get(["/article/:id", "/:category/:slugAndId", "/:category/:slug"], async (re
   }
 });
 
+async function injectInitialNews(html: string): Promise<string> {
+  try {
+    const articles = await fetchArticlesFromFirestoreWithTimeout(1200);
+    if (articles && articles.length > 0) {
+      articles.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+      const scriptTag = `<script id="initial-news">window.__INITIAL_NEWS__=${JSON.stringify(articles)};</script>`;
+      return html.replace("</head>", `${scriptTag}\n</head>`);
+    }
+  } catch (err) {
+    console.warn("Initial news injection warning:", err);
+  }
+  return html;
+}
+
 async function startServer() {
   // Serve static Vite site in dev or prod when running as standalone Node process
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
@@ -3639,6 +3684,7 @@ async function startServer() {
         const indexPath = path.join(process.cwd(), "index.html");
         let template = await fs.readFile(indexPath, "utf-8");
         template = await vite.transformIndexHtml(url, template);
+        template = await injectInitialNews(template);
         res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).end(template);
       } catch (e) {
         vite.ssrFixStacktrace(e as Error);
@@ -3658,13 +3704,16 @@ async function startServer() {
         }
       }
     }));
-    app.get("*", (req, res) => {
+    app.get("*", async (req, res) => {
       const distIndex = path.join(distPath, "index.html");
+      const targetFile = fsDirect.existsSync(distIndex) ? distIndex : path.join(process.cwd(), "index.html");
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      if (fsDirect.existsSync(distIndex)) {
-        res.sendFile(distIndex);
-      } else {
-        res.sendFile(path.join(process.cwd(), "index.html"));
+      try {
+        let template = await fs.readFile(targetFile, "utf-8");
+        template = await injectInitialNews(template);
+        res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).send(template);
+      } catch {
+        res.sendFile(targetFile);
       }
     });
   }
